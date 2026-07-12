@@ -1,0 +1,56 @@
+# =============================================================================
+# Leadforge — Caddyfile
+# =============================================================================
+#
+# Caddy serves as the reverse proxy with automatic HTTPS via Let's Encrypt.
+# In development, set APP_URL=http://localhost to skip TLS.
+# =============================================================================
+
+{
+	# Global options
+	email admin@leadforge.example.com
+}
+
+# Production — replace with your domain
+leadforge.example.com {
+	encode gzip zstd
+
+	# Health check endpoint — used by Docker healthchecks
+	handle /api/v1/health {
+		reverse_proxy dashboard:3000
+	}
+
+	# API (Phase 2: routes to api:3001)
+	handle /api/* {
+		reverse_proxy dashboard:3000
+	}
+
+	# Dashboard
+	handle {
+		reverse_proxy dashboard:3000
+	}
+
+	# Security headers
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "geolocation=(), microphone=(), camera=()"
+	}
+
+	# Access log
+	log {
+		output file /data/access.log {
+			roll_size 100mb
+			roll_keep 10
+		}
+		format json
+	}
+}
+
+# Development — HTTP only
+localhost {
+	encode gzip zstd
+	reverse_proxy dashboard:3000
+}

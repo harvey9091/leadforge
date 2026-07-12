@@ -1,0 +1,30 @@
+{
+  "name": "@leadforge/api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Fastify REST API for Leadforge (Phase 2)",
+  "type": "module",
+  "scripts": {
+    "dev": "bun --hot src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "fastify": "^5.0.0",
+    "@fastify/cors": "^10.0.0",
+    "@fastify/helmet": "^13.0.0",
+    "@fastify/rate-limit": "^10.0.0",
+    "@fastify/swagger": "^9.0.0",
+    "@fastify/swagger-ui": "^5.0.0",
+    "@fastify/cookie": "^11.0.0",
+    "@fastify/jwt": "^9.0.0",
+    "@prisma/client": "^6.0.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "vitest": "^2.0.0",
+    "prisma": "^6.0.0"
+  }
+}

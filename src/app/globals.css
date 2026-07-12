@@ -1,0 +1,285 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+}
+
+/* ============================================================
+   Design Tokens — Dark-first premium palette
+   Inspired by Linear, Claude, Vercel — restrained, mature, intentional
+   ============================================================ */
+:root {
+  /* Base radius — slightly tighter than default for a sharper, modern feel */
+  --radius: 0.625rem;
+
+  /* Light theme (secondary) — warm off-white */
+  --background: oklch(0.985 0.002 240);
+  --foreground: oklch(0.18 0.005 260);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.005 260);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.005 260);
+  --primary: oklch(0.18 0.005 260);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.96 0.003 240);
+  --secondary-foreground: oklch(0.2 0.005 260);
+  --muted: oklch(0.96 0.003 240);
+  --muted-foreground: oklch(0.5 0.008 260);
+  --accent: oklch(0.95 0.004 240);
+  --accent-foreground: oklch(0.2 0.005 260);
+  --destructive: oklch(0.58 0.21 25);
+  --destructive-foreground: oklch(0.985 0 0);
+  --success: oklch(0.62 0.13 155);
+  --success-foreground: oklch(0.985 0 0);
+  --warning: oklch(0.72 0.15 75);
+  --warning-foreground: oklch(0.18 0.005 260);
+  --info: oklch(0.6 0.1 220);
+  --info-foreground: oklch(0.985 0 0);
+  --border: oklch(0.9 0.004 240);
+  --input: oklch(0.9 0.004 240);
+  --ring: oklch(0.6 0.008 260);
+  --chart-1: oklch(0.62 0.13 155);
+  --chart-2: oklch(0.65 0.14 75);
+  --chart-3: oklch(0.58 0.16 25);
+  --chart-4: oklch(0.6 0.1 220);
+  --chart-5: oklch(0.55 0.12 290);
+  --sidebar: oklch(0.97 0.002 240);
+  --sidebar-foreground: oklch(0.18 0.005 260);
+  --sidebar-primary: oklch(0.18 0.005 260);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.94 0.003 240);
+  --sidebar-accent-foreground: oklch(0.2 0.005 260);
+  --sidebar-border: oklch(0.9 0.004 240);
+  --sidebar-ring: oklch(0.6 0.008 260);
+}
+
+/* Dark theme — the canonical, primary experience */
+.dark {
+  /* Background — near-black, very subtle cool undertone (zinc-950 inspired but warmer) */
+  --background: oklch(0.14 0.004 264);
+  --foreground: oklch(0.97 0.002 240);
+
+  /* Card — a whisper lighter than background, enough to separate */
+  --card: oklch(0.17 0.005 264);
+  --card-foreground: oklch(0.97 0.002 240);
+
+  /* Popover — same as card for consistency */
+  --popover: oklch(0.17 0.005 264);
+  --popover-foreground: oklch(0.97 0.002 240);
+
+  /* Primary — clean near-white for high-contrast actions */
+  --primary: oklch(0.97 0.002 240);
+  --primary-foreground: oklch(0.16 0.005 264);
+
+  /* Secondary — for muted interactive elements */
+  --secondary: oklch(0.21 0.005 264);
+  --secondary-foreground: oklch(0.97 0.002 240);
+
+  /* Muted — backgrounds for hover, skeletons */
+  --muted: oklch(0.21 0.005 264);
+  --muted-foreground: oklch(0.62 0.008 264);
+
+  /* Accent — subtle glass highlight */
+  --accent: oklch(0.23 0.006 264);
+  --accent-foreground: oklch(0.97 0.002 240);
+
+  /* Status colors — desaturated, premium, not neon */
+  --destructive: oklch(0.62 0.18 25);
+  --destructive-foreground: oklch(0.98 0 0);
+  --success: oklch(0.7 0.13 160);
+  --success-foreground: oklch(0.14 0.004 264);
+  --warning: oklch(0.78 0.14 75);
+  --warning-foreground: oklch(0.14 0.004 264);
+  --info: oklch(0.68 0.1 220);
+  --info-foreground: oklch(0.14 0.004 264);
+
+  /* Border — almost invisible, just enough to define edges */
+  --border: oklch(1 0 0 / 7%);
+  --input: oklch(1 0 0 / 12%);
+  --ring: oklch(0.55 0.008 264);
+
+  /* Chart palette — muted, complementary */
+  --chart-1: oklch(0.7 0.13 160);
+  --chart-2: oklch(0.72 0.14 75);
+  --chart-3: oklch(0.62 0.18 25);
+  --chart-4: oklch(0.68 0.1 220);
+  --chart-5: oklch(0.6 0.12 290);
+
+  /* Sidebar — slightly darker than main bg for depth */
+  --sidebar: oklch(0.12 0.004 264);
+  --sidebar-foreground: oklch(0.97 0.002 240);
+  --sidebar-primary: oklch(0.97 0.002 240);
+  --sidebar-primary-foreground: oklch(0.16 0.005 264);
+  --sidebar-accent: oklch(0.19 0.005 264);
+  --sidebar-accent-foreground: oklch(0.97 0.002 240);
+  --sidebar-border: oklch(1 0 0 / 6%);
+  --sidebar-ring: oklch(0.55 0.008 264);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11", "ss01";
+    font-variant-ligatures: contextual;
+    letter-spacing: -0.011em;
+  }
+
+  /* Premium scrollbar — thin, subtle, only visible on hover */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: oklch(1 0 0 / 8%);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: oklch(1 0 0 / 16%);
+    background-clip: content-box;
+  }
+
+  /* Selection — subtle, on-brand */
+  ::selection {
+    background: oklch(1 0 0 / 14%);
+    color: oklch(0.99 0 0);
+  }
+
+  /* Focus ring — refined, not overpowering */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-ring/60;
+  }
+}
+
+@layer utilities {
+  /* Glass effect — very subtle, used sparingly */
+  .glass {
+    background: oklch(0.17 0.005 264 / 70%);
+    backdrop-filter: blur(12px) saturate(140%);
+    -webkit-backdrop-filter: blur(12px) saturate(140%);
+  }
+  .glass-strong {
+    background: oklch(0.17 0.005 264 / 85%);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+  }
+
+  /* Soft elevated shadow for cards on dark backgrounds */
+  .shadow-premium {
+    box-shadow:
+      0 1px 2px 0 oklch(0 0 0 / 0.3),
+      0 1px 0 0 oklch(1 0 0 / 0.04) inset;
+  }
+  .shadow-premium-lg {
+    box-shadow:
+      0 0 0 1px oklch(1 0 0 / 0.05),
+      0 4px 12px -2px oklch(0 0 0 / 0.4),
+      0 8px 24px -4px oklch(0 0 0 / 0.3),
+      0 1px 0 0 oklch(1 0 0 / 0.04) inset;
+  }
+
+  /* Subtle top highlight — gives cards a "lit from above" feel */
+  .highlight-top {
+    position: relative;
+  }
+  .highlight-top::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      oklch(1 0 0 / 0.08),
+      transparent
+    );
+    pointer-events: none;
+  }
+
+  /* Number tabular alignment for KPIs and tables */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  /* Grid background pattern — for landing/empty states */
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, oklch(1 0 0 / 0.025) 1px, transparent 1px),
+      linear-gradient(to bottom, oklch(1 0 0 / 0.025) 1px, transparent 1px);
+    background-size: 56px 56px;
+  }
+  .bg-dots {
+    background-image: radial-gradient(oklch(1 0 0 / 0.06) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  /* Premium fade mask — for scrollable lists */
+  .mask-fade-r {
+    -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%);
+    mask-image: linear-gradient(to right, black 85%, transparent 100%);
+  }
+  .mask-fade-b {
+    -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
+    mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
+  }
+}

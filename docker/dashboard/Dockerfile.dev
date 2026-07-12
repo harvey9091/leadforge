@@ -1,0 +1,22 @@
+# =============================================================================
+# Leadforge Dashboard — Development Dockerfile
+# =============================================================================
+#
+# Used by docker-compose.dev.yml for local development with hot reload.
+# =============================================================================
+
+FROM node:20-alpine
+WORKDIR /app
+
+RUN npm install -g bun
+
+# Install dependencies first (cached layer)
+COPY package.json bun.lock ./
+RUN bun install
+
+# Source code is mounted as a volume for hot reload
+COPY . .
+
+EXPOSE 3000
+
+CMD ["bun", "run", "dev"]

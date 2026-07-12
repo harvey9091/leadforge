@@ -1,0 +1,326 @@
+/**
+ * =============================================================================
+ * Firecrawl Client + Direct HTTP Scraper Fallback
+ * =============================================================================
+ *
+ * Dual-mode enrichment:
+ *  1. If FIRECRAWL_API_URL is set and reachable → use Firecrawl for scraping
+ *  2. Otherwise → fall back to direct HTTP fetch + HTML parsing
+ *
+ * Both modes produce the same `CrawledPage` shape so downstream code
+ * doesn't care which mode was used.
+ *
+ * No mock data — every page is fetched from the real internet.
+ * =============================================================================
+ */
+
+import { fetchWithRetry, RateLimiter } from "@/server/discovery/http-client";
+import { logger } from "@/server/utils/logger";
+
+const rateLimiter = new RateLimiter(2); // 2 req/sec
+
+export interface CrawledPage {
+  url: string;
+  status: number;
+  ok: boolean;
+  html: string;
+  title?: string;
+  description?: string;
+  contentHash?: string;
+  wordCount: number;
+  fetchedAt: string;
+  durationMs: number;
+  redirected: boolean;
+  finalUrl: string;
+  contentType: string;
+  /** True if this came from Firecrawl, false if direct fetch */
+  fromFirecrawl: boolean;
+  /** Error message if fetch failed */
+  error?: string;
+}
+
+export interface FirecrawlConfig {
+  apiUrl: string;
+  apiKey?: string;
+  timeout: number;
+  maxRetries: number;
+}
+
+let cachedConfig: FirecrawlConfig | null = null;
+let healthChecked = false;
+let firecrawlAvailable = false;
+
+function getConfig(): FirecrawlConfig {
+  if (cachedConfig) return cachedConfig;
+  cachedConfig = {
+    // Support both FIRECRAWL_URL (production) and FIRECRAWL_API_URL (legacy)
+    apiUrl: process.env.FIRECRAWL_URL ?? process.env.FIRECRAWL_API_URL ?? "",
+    apiKey: process.env.FIRECRAWL_API_KEY ?? "",
+    timeout: parseInt(process.env.FIRECRAWL_TIMEOUT ?? "30000", 10),
+    maxRetries: parseInt(process.env.FIRECRAWL_MAX_RETRIES ?? "2", 10),
+  };
+  return cachedConfig;
+}
+
+/**
+ * Check if Firecrawl is available (cached after first check).
+ */
+export function isFirecrawlConfigured(): boolean {
+  return !!getConfig().apiUrl;
+}
+
+/**
+ * Health check — is Firecrawl reachable?
+ */
+export async function checkFirecrawlHealth(): Promise<{
+  available: boolean;
+  latencyMs?: number;
+  version?: string;
+  error?: string;
+}> {
+  const config = getConfig();
+  if (!config.apiUrl) {
+    return { available: false, error: "FIRECRAWL_URL not configured" };
+  }
+
+  if (healthChecked) {
+    return { available: firecrawlAvailable };
+  }
+
+  const start = performance.now();
+  try {
+    const result = await fetchWithRetry(`${config.apiUrl}/v1/health`, {
+      timeoutMs: 5000,
+      maxRetries: 1,
+      headers: config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {},
+    });
+    const latencyMs = Math.round(performance.now() - start);
+    firecrawlAvailable = result.ok;
+    healthChecked = true;
+    return {
+      available: result.ok,
+      latencyMs,
+      version: result.ok ? "unknown" : undefined,
+    };
+  } catch (err) {
+    firecrawlAvailable = false;
+    healthChecked = true;
+    return {
+      available: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+/**
+ * Crawl a single URL. Uses Firecrawl if available, otherwise direct fetch.
+ */
+export async function crawlPage(url: string): Promise<CrawledPage> {
+  await rateLimiter.wait();
+
+  const config = getConfig();
+  if (config.apiUrl && firecrawlAvailable) {
+    try {
+      return await crawlWithFirecrawl(url, config);
+    } catch (err) {
+      logger.warn("enrichment.firecrawl.fallback", {
+        url,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  return crawlDirect(url);
+}
+
+/**
+ * Crawl using Firecrawl's /v1/scrape endpoint.
+ */
+async function crawlWithFirecrawl(url: string, config: FirecrawlConfig): Promise<CrawledPage> {
+  const start = performance.now();
+  const result = await fetchWithRetry(`${config.apiUrl}/v1/scrape`, {
+    method: "POST",
+    timeoutMs: config.timeout,
+    maxRetries: config.maxRetries,
+    headers: {
+      "Content-Type": "application/json",
+      ...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {}),
+    },
+    body: {
+      url,
+      formats: ["html", "markdown"],
+      onlyMainContent: false,
+    },
+  });
+
+  const durationMs = Math.round(performance.now() - start);
+
+  if (!result.ok) {
+    throw new Error(`Firecrawl returned ${result.status}`);
+  }
+
+  const body = result.body as {
+    data?: {
+      html?: string;
+      markdown?: string;
+      metadata?: {
+        title?: string;
+        description?: string;
+        sourceURL?: string;
+        statusCode?: number;
+      };
+    };
+    success?: boolean;
+  };
+
+  const html = body.data?.html ?? "";
+  const title = body.data?.metadata?.title;
+  const description = body.data?.metadata?.description;
+  const finalUrl = body.data?.metadata?.sourceURL ?? url;
+  const status = body.data?.metadata?.statusCode ?? 200;
+
+  return {
+    url,
+    status,
+    ok: true,
+    html,
+    title,
+    description,
+    wordCount: countWords(stripHtml(html)),
+    fetchedAt: new Date().toISOString(),
+    durationMs,
+    redirected: finalUrl !== url,
+    finalUrl,
+    contentType: "text/html",
+    fromFirecrawl: true,
+    contentHash: hashContent(html),
+  };
+}
+
+/**
+ * Direct HTTP fetch — the fallback when Firecrawl isn't available.
+ * Still fetches real websites — no mock data.
+ */
+async function crawlDirect(url: string): Promise<CrawledPage> {
+  const start = performance.now();
+  const result = await fetchWithRetry(url, {
+    timeoutMs: 20_000,
+    maxRetries: 2,
+    headers: {
+      Accept: "text/html,application/xhtml+xml",
+    },
+  });
+
+  const durationMs = Math.round(performance.now() - start);
+
+  if (!result.ok) {
+    return {
+      url,
+      status: result.status,
+      ok: false,
+      html: "",
+      wordCount: 0,
+      fetchedAt: new Date().toISOString(),
+      durationMs,
+      redirected: result.url !== url,
+      finalUrl: result.url,
+      contentType: "text/html",
+      fromFirecrawl: false,
+      error: result.error,
+    };
+  }
+
+  const html = (result.body as string) ?? "";
+  // Cap HTML at 500KB to prevent memory issues
+  const cappedHtml = html.length > 500_000 ? html.slice(0, 500_000) : html;
+  const { title, description } = extractMeta(cappedHtml);
+
+  return {
+    url,
+    status: result.status,
+    ok: true,
+    html: cappedHtml,
+    title,
+    description,
+    wordCount: countWords(stripHtml(cappedHtml)),
+    fetchedAt: new Date().toISOString(),
+    durationMs,
+    redirected: result.url !== url,
+    finalUrl: result.url,
+    contentType: result.headers["content-type"] ?? "text/html",
+    fromFirecrawl: false,
+    contentHash: hashContent(cappedHtml),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function stripHtml(html: string): string {
+  return html
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function countWords(text: string): number {
+  return text.split(/\s+/).filter((w) => w.length > 0).length;
+}
+
+function extractMeta(html: string): { title?: string; description?: string } {
+  const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+  const descMatch = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i)
+    ?? html.match(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i)
+    ?? html.match(/<meta[^>]+name=["']twitter:description["'][^>]+content=["']([^"']+)["']/i);
+
+  return {
+    title: titleMatch?.[1]?.trim(),
+    description: descMatch?.[1]?.trim(),
+  };
+}
+
+function hashContent(content: string): string {
+  // Simple hash for change detection
+  let hash = 0;
+  for (let i = 0; i < content.length; i++) {
+    const char = content.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return hash.toString(36);
+}
+
+/**
+ * Sanitize HTML — prevent XSS. Removes script tags, event handlers,
+ * and dangerous attributes. Used before storing content.
+ */
+export function sanitizeHtml(html: string): string {
+  return html
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+    .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, "")
+    .replace(/<object[^>]*>[\s\S]*?<\/object>/gi, "")
+    .replace(/<embed[^>]*>/gi, "")
+    .replace(/\son\w+\s*=\s*"[^"]*"/gi, "")
+    .replace(/\son\w+\s*=\s*'[^']*'/gi, "")
+    .replace(/javascript:/gi, "");
+}
+
+/**
+ * Validate a URL — reject malformed URLs and non-HTTP schemes.
+ */
+export function validateUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}

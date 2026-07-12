@@ -1,0 +1,56 @@
+# =============================================================================
+# Leadforge — Development Docker Compose
+# =============================================================================
+#
+# Lightweight dev environment: just Postgres + Redis + RabbitMQ.
+# The dashboard runs on the host via `bun run dev` for hot reload.
+# =============================================================================
+
+name: leadforge-dev
+
+networks:
+  lf-dev:
+    driver: bridge
+
+volumes:
+  lf-dev-postgres:
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: lf-dev-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: leadforge_dev
+      POSTGRES_USER: leadforge
+      POSTGRES_PASSWORD: leadforge_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - lf-dev-postgres:/var/lib/postgresql/data
+    networks: [lf-dev]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U leadforge -d leadforge_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: lf-dev-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks: [lf-dev]
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: lf-dev-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: leadforge
+      RABBITMQ_DEFAULT_PASS: leadforge_dev
+    ports:
+      - "5672:5672"
+      - "15672:15672"  # management UI
+    networks: [lf-dev]

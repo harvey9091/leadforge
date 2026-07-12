@@ -1,0 +1,1545 @@
+// =============================================================================
+// Leadforge — Prisma Schema (Phase 2: Discovery Engine)
+// =============================================================================
+//
+// This schema is intentionally written to be 1:1 portable to PostgreSQL —
+// no SQLite-specific types are used. The dev environment uses SQLite;
+// production (Docker Compose) uses PostgreSQL 16.
+//
+// Phase 2 additions:
+//   - DiscoveryJob: user-created discovery job with config + progress
+//   - DiscoveryLog: per-job structured log entries
+//   - Tag: first-class tag entity (replaces JSON array on Company)
+//   - Category: industry/category taxonomy
+//   - Company: enhanced with country, employeeEstimate, searchVector
+//   - Source: enhanced with discoveryJobId for provenance tracking
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// -----------------------------------------------------------------------------
+//  Auth & Users
+// -----------------------------------------------------------------------------
+
+model User {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  name          String?
+  passwordHash  String
+  role          UserRole       @default(USER)
+  avatarUrl     String?
+  emailVerified DateTime?
+  lastLoginAt   DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  refreshTokens RefreshToken[]
+  auditLogs     AuditLog[]
+  apiKeys       ApiKey[]
+  discoveryJobs DiscoveryJob[]
+
+  @@index([email])
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+model RefreshToken {
+  id          String   @id @default(cuid())
+  userId      String
+  tokenHash   String   @unique
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  userAgent   String?
+  ip          String?
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model ApiKey {
+  id           String    @id @default(cuid())
+  userId       String
+  name         String
+  keyPrefix    String
+  keyHash      String    @unique
+  lastUsedAt   DateTime?
+  expiresAt    DateTime?
+  revokedAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// -----------------------------------------------------------------------------
+//  Companies
+// -----------------------------------------------------------------------------
+
+model Company {
+  id              String       @id @default(cuid())
+  name            String
+  legalName       String?
+  domain          String?      @unique
+  apexDomain      String?
+  description     String?
+  logoUrl         String?
+  website         String?
+  stage           CompanyStage?
+  size            CompanySize?
+  industry        String?
+  country         String?
+  headquarters    String?
+  foundedYear     Int?
+  employeeEstimate String?
+  fundingStage    String?
+  linkedinUrl     String?
+  twitterUrl      String?
+  crunchbaseUrl   String?
+  technologies    String       @default("[]")
+  score           Int?
+  grade           LeadGrade?
+  status          LeadStatus   @default(NEW)
+  searchVector    String       @default("")
+  discoveredAt    DateTime     @default(now())
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  // Enrichment fields (Phase 3)
+  headline        String?
+  category        String?
+  subCategory     String?
+  icpHints        String       @default("[]")
+  targetCustomer  String?
+  pricingModel    String?
+  pricingDetected Boolean       @default(false)
+  trialDetected   Boolean       @default(false)
+  freemiumDetected Boolean      @default(false)
+  enterpriseDetected Boolean    @default(false)
+  callToAction    String?
+  heroImageUrl    String?
+  languages       String       @default("[]")
+  timezone        String?
+  supportEmail    String?
+  contactEmail    String?
+  phone           String?
+  address         String?
+  // Website health
+  websiteHttps    Boolean?
+  websiteStatus   Int?
+  websiteSpeedMs  Int?
+  websiteRedirects Boolean?
+  robotsTxt       String?
+  sitemapUrl      String?
+  canonicalUrl    String?
+  // Enrichment metadata
+  lastEnrichedAt  DateTime?
+  enrichmentStatus String?
+  enrichmentPages Int?
+  enrichmentDurationMs Int?
+  lastScreenshotAt DateTime?
+
+  people          Person[]
+  websites        Website[]
+  sources         Source[]
+  scores          Score[]
+  campaigns       CampaignTarget[]
+  tags            CompanyTag[]
+  enrichmentJobs  EnrichmentJob[]
+  snapshots       WebsiteSnapshot[]
+  contentBlocks   ContentBlock[]
+  companyTechnologies CompanyTechnology[]
+  aiAnalyses       AIAnalysis[]
+  collections      CollectionCompany[]
+  notes            Note[]
+  pinned           PinnedCompany?
+  feedback         CompanyFeedback[]
+  aliases          CompanyAlias[]
+  signals          Signal[]
+  timelineEvents   TimelineEvent[]
+  historicalSnapshots HistoricalSnapshot[]
+  watchlistItems   WatchlistItem[]
+  recommendations  Recommendation[]
+  similaritySource SimilarityResult[] @relation("SimilaritySource")
+  similarityTarget SimilarityResult[] @relation("SimilarityTarget")
+  semanticEmbedding SemanticEmbedding?
+
+  @@index([status])
+  @@index([stage])
+  @@index([grade])
+  @@index([industry])
+  @@index([country])
+  @@index([apexDomain])
+  @@index([discoveredAt])
+  @@index([name])
+}
+
+enum CompanyStage {
+  PRE_SEED
+  SEED
+  SERIES_A
+  SERIES_B
+  SERIES_C_PLUS
+  BOOTSTRAPPED
+  ACQUIRED
+  PUBLIC
+}
+
+enum CompanySize {
+  ONE_TO_TEN
+  ELEVEN_TO_FIFTY
+  FIFTY_ONE_TO_TWO_HUNDRED
+  TWO_HUNDRED_ONE_TO_FIVE_HUNDRED
+  FIVE_HUNDRED_ONE_TO_THOUSAND
+  THOUSAND_PLUS
+}
+
+enum LeadStatus {
+  NEW
+  QUALIFIED
+  DISQUALIFIED
+  CONTACTED
+  RESPONDED
+  MEETING_BOOKED
+  CLOSED_WON
+  CLOSED_LOST
+}
+
+enum LeadGrade {
+  A
+  B
+  C
+  D
+  F
+}
+
+// -----------------------------------------------------------------------------
+//  Tags & Categories (first-class entities for searchability)
+// -----------------------------------------------------------------------------
+
+model Tag {
+  id        String       @id @default(cuid())
+  name      String       @unique
+  slug      String       @unique
+  createdAt DateTime     @default(now())
+
+  companies CompanyTag[]
+
+  @@index([slug])
+}
+
+model CompanyTag {
+  companyId String
+  tagId     String
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  tag     Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([companyId, tagId])
+  @@index([tagId])
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  slug      String   @unique
+  parentId  String?
+  createdAt DateTime @default(now())
+
+  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children Category[] @relation("CategoryHierarchy")
+
+  @@index([slug])
+  @@index([parentId])
+}
+
+// -----------------------------------------------------------------------------
+//  People & Emails
+// -----------------------------------------------------------------------------
+
+model Person {
+  id            String    @id @default(cuid())
+  companyId     String
+  fullName      String
+  firstName     String?
+  lastName      String?
+  email         String?
+  emailVerified Boolean   @default(false)
+  title         String?
+  seniority     String?
+  department    String?
+  linkedinUrl   String?
+  avatarUrl     String?
+  phone         String?
+  verified      Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([email])
+  @@index([seniority])
+}
+
+model Email {
+  id          String    @id @default(cuid())
+  personId    String
+  address     String
+  verified    Boolean   @default(false)
+  verifiedAt  DateTime?
+  source      String?
+  createdAt   DateTime  @default(now())
+
+  @@index([personId])
+  @@index([address])
+}
+
+model Website {
+  id           String    @id @default(cuid())
+  companyId    String
+  url          String
+  pageType     PageType
+  title        String?
+  description  String?
+  scrapedAt    DateTime?
+  contentHash  String?
+  wordCount    Int?
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([pageType])
+}
+
+enum PageType {
+  HOMEPAGE
+  PRICING
+  ABOUT
+  CAREERS
+  BLOG
+  CHANGELOG
+  CONTACT
+  LEGAL
+  OTHER
+}
+
+// -----------------------------------------------------------------------------
+//  Sources — provenance tracking
+// -----------------------------------------------------------------------------
+
+model Source {
+  id              String    @id @default(cuid())
+  companyId       String
+  type            SourceType
+  externalId      String?
+  url             String?
+  rawPayload      String
+  discoveryJobId  String?
+  confidence      Int       @default(50)
+  firstSeenAt     DateTime  @default(now())
+  lastSeenAt      DateTime  @default(now())
+
+  company        Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  discoveryJob   DiscoveryJob? @relation(fields: [discoveryJobId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([type])
+  @@index([discoveryJobId])
+  @@index([externalId])
+}
+
+enum SourceType {
+  YC
+  PRODUCT_HUNT
+  BETALIST
+  UNEED
+  DEVHUNT
+  HACKER_NEWS
+  SEC_EDGAR
+  GREENHOUSE
+  LEVER
+  ASHBY
+  MANUAL
+  API
+}
+
+// -----------------------------------------------------------------------------
+//  Scores
+// -----------------------------------------------------------------------------
+
+model Score {
+  id                  String    @id @default(cuid())
+  companyId           String
+  overall             Int
+  grade               LeadGrade
+  icpFit              Int
+  maturity            Int
+  pricingAvailability Int
+  hiring              Int
+  funding             Int
+  launchRecency       Int
+  websiteQuality      Int
+  videoOpportunity    Int
+  reason              String?
+  createdAt           DateTime  @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([grade])
+}
+
+// -----------------------------------------------------------------------------
+//  Discovery Jobs (Phase 2)
+// -----------------------------------------------------------------------------
+
+model DiscoveryJob {
+  id              String           @id @default(cuid())
+  name            String
+  status          DiscoveryJobStatus @default(QUEUED)
+  sources         String           @default("[]")
+  maxCompanies    Int              @default(100)
+  keywords        String           @default("[]")
+  categories      String           @default("[]")
+  regions         String           @default("[]")
+  fundingStages   String           @default("[]")
+  hiringOnly      Boolean          @default(false)
+  dateFrom        DateTime?
+  dateTo          DateTime?
+
+  // Progress tracking
+  companiesFound  Int              @default(0)
+  companiesStored  Int             @default(0)
+  duplicatesFound Int              @default(0)
+  errorsCount     Int              @default(0)
+  retriesCount    Int              @default(0)
+  currentSource   String?
+  currentPage     Int              @default(0)
+  totalPages      Int              @default(0)
+
+  // Lifecycle timestamps
+  startedAt       DateTime?
+  completedAt     DateTime?
+  pausedAt        DateTime?
+  cancelledAt     DateTime?
+  lastHeartbeat   DateTime?
+  estimatedCompletion DateTime?
+
+  // Metadata
+  createdBy       String?
+  errorMessage    String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  logs            DiscoveryLog[]
+  jobSources      Source[]
+  timeline        DiscoveryTimeline[]
+  user            User?            @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([createdBy])
+}
+
+enum DiscoveryJobStatus {
+  QUEUED
+  RUNNING
+  PAUSED
+  COMPLETED
+  FAILED
+  CANCELLED
+  RETRYING
+}
+
+model DiscoveryLog {
+  id          String   @id @default(cuid())
+  jobId       String
+  level       DiscoveryLogLevel
+  source      String?
+  message     String
+  metadata    String   @default("{}")
+  createdAt   DateTime @default(now())
+
+  job DiscoveryJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@index([level])
+  @@index([createdAt])
+}
+
+enum DiscoveryLogLevel {
+  DEBUG
+  INFO
+  WARN
+  ERROR
+}
+
+// -----------------------------------------------------------------------------
+//  Campaigns (Phase 3+ — not used in Phase 2)
+// -----------------------------------------------------------------------------
+
+model Campaign {
+  id              String            @id @default(cuid())
+  name            String
+  description     String?
+  status          CampaignStatus    @default(DRAFT)
+  startDate       DateTime?
+  endDate         DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  targets         CampaignTarget[]
+  outreach        Outreach[]
+
+  @@index([status])
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+model CampaignTarget {
+  id          String   @id @default(cuid())
+  campaignId  String
+  companyId   String
+  status      String   @default("PENDING")
+  addedAt     DateTime @default(now())
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, companyId])
+}
+
+model Outreach {
+  id           String    @id @default(cuid())
+  campaignId   String?
+  personId     String?
+  companyId    String?
+  channel      String
+  subject      String?
+  body         String?
+  status       String    @default("QUEUED")
+  sentAt       DateTime?
+  respondedAt  DateTime?
+  createdAt    DateTime  @default(now())
+
+  campaign Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  @@index([campaignId])
+  @@index([status])
+}
+
+// -----------------------------------------------------------------------------
+//  Jobs (generic background job queue — Phase 1 legacy, superseded by DiscoveryJob)
+// -----------------------------------------------------------------------------
+
+model Job {
+  id           String    @id @default(cuid())
+  type         JobType
+  status       JobStatus @default(QUEUED)
+  priority     Int       @default(5)
+  payload      String
+  result       String?
+  error        String?
+  attempts     Int       @default(0)
+  maxAttempts  Int       @default(3)
+  scheduledFor DateTime  @default(now())
+  startedAt    DateTime?
+  completedAt  DateTime?
+  durationMs   Int?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([type, status])
+  @@index([status, scheduledFor])
+}
+
+enum JobType {
+  DISCOVERY
+  NORMALIZATION
+  DEDUPLICATION
+  ENRICHMENT
+  SCRAPING
+  AI_QUALIFICATION
+  EMAIL_VERIFICATION
+  CLEANUP
+  SCHEDULER
+}
+
+enum JobStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  RETRYING
+  CANCELLED
+}
+
+// -----------------------------------------------------------------------------
+//  Audit Log
+// -----------------------------------------------------------------------------
+
+model AuditLog {
+  id         String      @id @default(cuid())
+  userId     String?
+  action     AuditAction
+  entity     String
+  entityId   String?
+  before     String?
+  after      String?
+  ip         String?
+  userAgent  String?
+  requestId  String?
+  createdAt  DateTime    @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([createdAt])
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  EXPORT
+  IMPORT
+  CONFIGURE
+}
+
+// =============================================================================
+//  Phase 2.5 — Architecture Hardening
+// =============================================================================
+
+// Job timeline — every step of a discovery job
+model DiscoveryTimeline {
+  id          String   @id @default(cuid())
+  jobId       String
+  step        String
+  message     String
+  metadata    String   @default("{}")
+  timestamp   DateTime @default(now())
+
+  job DiscoveryJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@index([timestamp])
+}
+
+// Merge history — never silently merge companies
+model MergeHistory {
+  id              String   @id @default(cuid())
+  targetCompanyId String
+  duplicateName   String
+  duplicateDomain String?
+  matchStrategy   String
+  similarity      Float
+  operator        String   @default("system")
+  jobId           String?
+  mergedAt        DateTime @default(now())
+
+  @@index([targetCompanyId])
+  @@index([mergedAt])
+}
+
+// Source confidence configuration
+model SourceConfidence {
+  id          String   @id @default(cuid())
+  sourceType  String   @unique
+  confidence  Int      @default(50)
+  updatedAt   DateTime @updatedAt
+}
+
+// =============================================================================
+//  Phase 3 — Enrichment Engine
+// =============================================================================
+
+model EnrichmentJob {
+  id              String              @id @default(cuid())
+  companyId       String
+  status          EnrichmentJobStatus @default(QUEUED)
+  pagesCrawled    Int                 @default(0)
+  technologiesFound Int               @default(0)
+  screenshotsTaken Int                @default(0)
+  errorMessage    String?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  lastHeartbeat   DateTime?
+  durationMs      Int?
+  workerId        String?
+  schedule        String?             @default("manual")
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  company     Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  logs        EnrichmentLog[]
+
+  @@index([status])
+  @@index([companyId])
+  @@index([createdAt])
+}
+
+enum EnrichmentJobStatus {
+  QUEUED
+  RUNNING
+  PAUSED
+  COMPLETED
+  FAILED
+  CANCELLED
+  RETRYING
+}
+
+model EnrichmentLog {
+  id          String   @id @default(cuid())
+  jobId       String
+  level       String   @default("INFO")
+  page        String?
+  message     String
+  metadata    String   @default("{}")
+  durationMs  Int?
+  timestamp   DateTime @default(now())
+
+  job EnrichmentJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@index([level])
+  @@index([timestamp])
+}
+
+// Website snapshots — historical captures for diff engine
+model WebsiteSnapshot {
+  id          String   @id @default(cuid())
+  companyId   String
+  url         String
+  pageType    String
+  title       String?
+  description String?
+  contentHash String?
+  wordCount   Int?
+  capturedAt  DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([pageType])
+  @@index([capturedAt])
+}
+
+// Technology detection
+model Technology {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  category    String   @default("unknown")
+  description String?
+  createdAt   DateTime @default(now())
+
+  companies CompanyTechnology[]
+
+  @@index([slug])
+  @@index([category])
+}
+
+model CompanyTechnology {
+  companyId   String
+  technologyId String
+  detectedAt  DateTime @default(now())
+  confidence  Int      @default(100)
+
+  company    Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  technology Technology @relation(fields: [technologyId], references: [id], onDelete: Cascade)
+
+  @@id([companyId, technologyId])
+  @@index([technologyId])
+}
+
+// Pricing information
+model Pricing {
+  id          String   @id @default(cuid())
+  companyId   String
+  planName    String
+  price       String?
+  currency    String?
+  period      String?
+  features    String   @default("[]")
+  url         String?
+  detectedAt  DateTime @default(now())
+
+  @@index([companyId])
+  @@index([detectedAt])
+}
+
+// Screenshots
+model Screenshot {
+  id          String   @id @default(cuid())
+  companyId   String
+  pageType    String
+  url         String
+  thumbnailUrl String?
+  fullUrl     String?
+  width       Int?
+  height      Int?
+  capturedAt  DateTime @default(now())
+
+  @@index([companyId])
+  @@index([pageType])
+  @@index([capturedAt])
+}
+
+// Content blocks — structured content extracted from pages
+model ContentBlock {
+  id          String   @id @default(cuid())
+  companyId   String
+  pageType    String
+  blockType   String   @default("paragraph")
+  heading     String?
+  content     String
+  order       Int      @default(0)
+  extractedAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([pageType])
+  @@index([blockType])
+}
+
+// =============================================================================
+//  Phase 4 — Lead Intelligence Engine (FreeLLM)
+// =============================================================================
+
+model AIAnalysis {
+  id              String   @id @default(cuid())
+  companyId       String
+  status          String   @default("pending")
+  promptVersion   String   @default("1.0.0")
+  promptHash      String
+  modelVersion    String   @default("default")
+  websiteHash     String?
+
+  // Business intelligence
+  summaryOneLine  String?
+  summaryParagraph String?
+  summaryDetailed String?
+  productCategory String?
+  subCategory     String?
+  industry        String?
+  targetMarket    String?
+  targetCustomer  String?
+  customerProfile String?
+
+  // Pricing intelligence
+  pricingModel    String?
+  pricingEstimate String?
+  budgetCategory  String?
+
+  // Company stage
+  companyStage    String?
+  stageConfidence Int?
+
+  // Hiring intelligence
+  hiringStatus    String?
+  hiringTrend     String?
+  teamComposition String?
+  remoteFirst     Boolean?
+
+  // Product maturity
+  productMaturity String?
+
+  // Website quality scores (0-100)
+  websiteVisualQuality Int?
+  websiteUX         Int?
+  websiteCopywriting Int?
+  websiteBrand      Int?
+  websitePerformance Int?
+  websiteProfessionalism Int?
+  websiteModernity  Int?
+  websiteOverall    Int?
+
+  // Video opportunity scores (0-100)
+  videoProductVideo Int?
+  videoExplainer    Int?
+  videoHomepageAnimation Int?
+  videoDemoVideo    Int?
+  videoLaunchTrailer Int?
+  videoOnboarding   Int?
+  videoFeatureUpdates Int?
+  videoSocialContent Int?
+  videoOverall      Int?
+
+  // ICP + Qualification
+  icpMatchPct       Int?
+  icpReasons        String   @default("[]")
+  icpMissingReqs    String   @default("[]")
+  icpStrengths      String   @default("[]")
+  icpWeaknesses     String   @default("[]")
+  qualificationScore Int?
+  qualificationReasons String @default("[]")
+
+  // Risk + Opportunity
+  riskFactors      String   @default("[]")
+  opportunityFactors String @default("[]")
+
+  // Overall confidence
+  overallConfidence Int?
+
+  // Metadata
+  tokensUsed       Int?
+  durationMs       Int?
+  errorMessage     String?
+  analyzedAt       DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  evidence         AIEvidence[]
+  company          Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([status])
+  @@index([analyzedAt])
+  @@index([promptHash])
+}
+
+model AIEvidence {
+  id          String   @id @default(cuid())
+  analysisId  String
+  field       String
+  value       String
+  confidence  Int
+  source      String
+  evidence    String
+  reasoning   String?
+  createdAt   DateTime @default(now())
+
+  analysis AIAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@index([analysisId])
+  @@index([field])
+}
+
+model ICPConfig {
+  id              String   @id @default(cuid())
+  name            String   @default("Default ICP")
+  industries      String   @default("[]")
+  categories      String   @default("[]")
+  targetMarkets   String   @default("[]")
+  minEmployees    Int?
+  maxEmployees    Int?
+  fundingStages   String   @default("[]")
+  hiringRoles     String   @default("[]")
+  pricingVisible  Boolean  @default(true)
+  regions         String   @default("[]")
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model PromptCache {
+  id              String   @id @default(cuid())
+  cacheKey        String   @unique
+  companyId       String
+  promptHash      String
+  websiteHash     String
+  promptVersion   String
+  modelVersion    String
+  response        String
+  tokensUsed      Int?
+  createdAt       DateTime @default(now())
+
+  @@index([companyId])
+  @@index([cacheKey])
+}
+
+model AIJob {
+  id              String   @id @default(cuid())
+  companyId       String?
+  batchId         String?
+  status          String   @default("QUEUED")
+  type            String   @default("single")
+  total           Int      @default(1)
+  completed       Int      @default(0)
+  failed          Int      @default(0)
+  errorMessage    String?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  lastHeartbeat   DateTime?
+  workerId        String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([status])
+  @@index([batchId])
+  @@index([companyId])
+}
+
+// =============================================================================
+//  Phase 5 — Lead Intelligence Workspace
+// =============================================================================
+
+// Custom collections — smart folders for organizing companies
+model Collection {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  color       String   @default("#6b7280")
+  icon        String?
+  isSmart     Boolean  @default(false)
+  smartQuery  String?
+  isPinned    Boolean  @default(false)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  companies   CollectionCompany[]
+
+  @@index([isPinned])
+}
+
+model CollectionCompany {
+  collectionId String
+  companyId    String
+  addedAt      DateTime @default(now())
+  addedBy      String?
+
+  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  company    Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@id([collectionId, companyId])
+  @@index([companyId])
+}
+
+// Notes — markdown notes attached to companies
+model Note {
+  id          String   @id @default(cuid())
+  companyId   String
+  authorId    String?
+  authorName  String?
+  content     String
+  contentHtml String?
+  version     Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([createdAt])
+}
+
+// Saved views — searches, filters, layouts
+model SavedView {
+  id          String   @id @default(cuid())
+  name        String
+  type        String   @default("search")
+  query       String?
+  filters     String   @default("{}")
+  columns     String   @default("[]")
+  sortBy      String?
+  sortDir     String   @default("desc")
+  isPinned    Boolean  @default(false)
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([type])
+  @@index([isPinned])
+}
+
+// Export profiles — reusable export templates
+model ExportProfile {
+  id          String   @id @default(cuid())
+  name        String
+  format      String   @default("csv")
+  preset      String?
+  columns     String   @default("[]")
+  fieldMapping String  @default("{}")
+  includeHeaders Boolean @default(true)
+  isPinned    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([format])
+}
+
+// Export history — record of all exports
+model ExportHistory {
+  id          String   @id @default(cuid())
+  profileId   String?
+  profileName String?
+  format      String
+  status      String   @default("pending")
+  totalRows   Int      @default(0)
+  processedRows Int    @default(0)
+  fileSize    Int?
+  fileUrl     String?
+  errorMessage String?
+  filters     String   @default("{}")
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+// Search history
+model SearchHistory {
+  id          String   @id @default(cuid())
+  query       String
+  resultsCount Int?
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([query])
+}
+
+// Pinned companies
+model PinnedCompany {
+  companyId   String
+  pinnedAt    DateTime @default(now())
+  sortOrder   Int      @default(0)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@id([companyId])
+}
+
+// Workspace preferences
+model WorkspacePrefs {
+  id              String   @id @default(cuid())
+  userId          String?
+  sidebarCollapsed Boolean @default(false)
+  defaultView     String?
+  pageSize        Int      @default(50)
+  density         String   @default("comfortable")
+  theme           String   @default("dark")
+  columns         String   @default("[]")
+  filters         String   @default("{}")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// =============================================================================
+//  Phase 6 — Lead Quality Optimization Engine
+// =============================================================================
+
+// Source quality metrics — tracks discovery performance per source
+model SourceMetric {
+  id              String   @id @default(cuid())
+  sourceType      String   @unique
+  priority        Int      @default(50)
+  companiesDiscovered Int  @default(0)
+  companiesRetained Int    @default(0)
+  duplicateCount  Int      @default(0)
+  enrichmentSuccess Int    @default(0)
+  enrichmentFailure Int    @default(0)
+  avgQualificationScore Float @default(0)
+  avgConfidence   Float    @default(0)
+  avgIcpMatch     Float    @default(0)
+  exportRate      Float    @default(0)
+  reliabilityScore Float   @default(50)
+  lastCrawlAt     DateTime?
+  lastSuccessAt   DateTime?
+  lastFailureAt   DateTime?
+  failureCount    Int      @default(0)
+  consecutiveFailures Int  @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// Crawl state — incremental crawling support
+model CrawlState {
+  id              String   @id @default(cuid())
+  url             String   @unique
+  companyId       String?
+  sourceType      String?
+  etag            String?
+  lastModified    String?
+  contentHash     String?
+  lastCrawledAt   DateTime?
+  crawlCount      Int      @default(0)
+  changeCount     Int      @default(0)
+  lastChangedAt   DateTime?
+  avgChangeFrequencyHours Float @default(168)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([sourceType])
+  @@index([lastCrawledAt])
+}
+
+// Prompt versions — AI prompt versioning + A/B testing
+model PromptVersion {
+  id              String   @id @default(cuid())
+  version         String   @unique
+  systemPrompt    String
+  description     String?
+  isActive        Boolean  @default(true)
+  isDefault       Boolean  @default(false)
+  totalAnalyses   Int      @default(0)
+  totalTokensUsed Int      @default(0)
+  avgConfidence   Float    @default(0)
+  avgDurationMs   Float    @default(0)
+  avgIcpMatch     Float    @default(0)
+  avgQualification Float   @default(0)
+  successRate     Float    @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([isDefault])
+}
+
+// A/B test — compare prompt versions
+model PromptABTest {
+  id              String   @id @default(cuid())
+  name            String
+  versionAId      String
+  versionBId      String
+  status          String   @default("running")
+  sampleSize      Int      @default(50)
+  samplesRun      Int      @default(0)
+  versionAResults String   @default("[]")
+  versionBResults String   @default("[]")
+  winnerVersionId String?
+  createdAt       DateTime @default(now())
+  completedAt     DateTime?
+}
+
+// Company feedback — quality feedback loop
+model CompanyFeedback {
+  id              String   @id @default(cuid())
+  companyId       String
+  rating          String
+  notes           String?
+  userId          String?
+  createdAt       DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([rating])
+  @@index([createdAt])
+}
+
+// Company alias — for smarter deduplication
+model CompanyAlias {
+  id              String   @id @default(cuid())
+  companyId       String
+  alias           String
+  aliasType       String   @default("name")
+  createdAt       DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, alias, aliasType])
+  @@index([alias])
+  @@index([aliasType])
+}
+
+// System metrics — operational observability
+model SystemMetric {
+  id              String   @id @default(cuid())
+  metric          String
+  value           Float
+  unit            String?
+  labels          String   @default("{}")
+  timestamp       DateTime @default(now())
+
+  @@index([metric])
+  @@index([timestamp])
+  @@index([metric, timestamp])
+}
+
+// Worker health — track worker status and throughput
+model WorkerHealth {
+  id              String   @id @default(cuid())
+  workerType      String
+  workerId        String
+  status          String   @default("running")
+  activeJobs      Int      @default(0)
+  totalProcessed  Int      @default(0)
+  totalErrors     Int      @default(0)
+  avgProcessingMs Float    @default(0)
+  lastHeartbeat   DateTime @default(now())
+  startedAt       DateTime @default(now())
+  stoppedAt       DateTime?
+
+  @@index([workerType])
+  @@index([status])
+  @@index([workerId])
+}
+
+// Backup records — track backup operations
+model BackupRecord {
+  id              String   @id @default(cuid())
+  type            String   @default("full")
+  status          String   @default("pending")
+  fileSize        Int?
+  fileUrl         String?
+  checksum        String?
+  errorMessage    String?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime @default(now())
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+// =============================================================================
+//  Phase 7 — Lead Intelligence V2 & Signal Engine
+// =============================================================================
+
+// Signals — detected events from enrichment, AI, and crawl changes
+model Signal {
+  id              String   @id @default(cuid())
+  companyId       String
+  signalType      String
+  title           String
+  description     String?
+  importance      Int      @default(50)
+  confidence      Int      @default(50)
+  source          String
+  evidence        String?
+  detectedAt      DateTime @default(now())
+  isRead          Boolean  @default(false)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([signalType])
+  @@index([detectedAt])
+  @@index([importance])
+  @@index([isRead])
+}
+
+// Timeline events — chronological history of a company
+model TimelineEvent {
+  id              String   @id @default(cuid())
+  companyId       String
+  eventType       String
+  title           String
+  description     String?
+  metadata        String   @default("{}")
+  timestamp       DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([timestamp])
+  @@index([eventType])
+}
+
+// Historical snapshots — point-in-time captures of company data
+model HistoricalSnapshot {
+  id              String   @id @default(cuid())
+  companyId       String
+  snapshotType    String   @default("enrichment")
+  data            String
+  contentHash     String?
+  capturedAt      DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([snapshotType])
+  @@index([capturedAt])
+}
+
+// Watchlists — user-created tracking lists
+model Watchlist {
+  id              String   @id @default(cuid())
+  name            String
+  description     String?
+  color           String   @default("#6b7280")
+  criteria        String   @default("{}")
+  isAutoUpdating  Boolean  @default(true)
+  isPinned        Boolean  @default(false)
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  items           WatchlistItem[]
+
+  @@index([isPinned])
+}
+
+model WatchlistItem {
+  id              String   @id @default(cuid())
+  watchlistId     String
+  companyId       String
+  addedAt         DateTime @default(now())
+  addedReason     String?
+
+  watchlist Watchlist @relation(fields: [watchlistId], references: [id], onDelete: Cascade)
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([watchlistId, companyId])
+  @@index([companyId])
+}
+
+// Recommendations — action suggestions for companies
+model Recommendation {
+  id              String   @id @default(cuid())
+  companyId       String
+  action          String
+  reason          String
+  priority        Int      @default(50)
+  isDismissed     Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([priority])
+  @@index([isDismissed])
+}
+
+// Trend metrics — aggregate trend calculations
+model TrendMetric {
+  id              String   @id @default(cuid())
+  metric          String
+  value           Float
+  previousValue   Float?
+  changePct       Float?
+  period          String   @default("30d")
+  labels          String   @default("{}")
+  timestamp       DateTime @default(now())
+
+  @@index([metric])
+  @@index([timestamp])
+  @@index([period])
+}
+
+// Similarity results — cached company similarity scores
+model SimilarityResult {
+  id              String   @id @default(cuid())
+  companyId       String
+  similarCompanyId String
+  score           Float
+  factors         String   @default("{}")
+  computedAt      DateTime @default(now())
+
+  company         Company  @relation("SimilaritySource", fields: [companyId], references: [id], onDelete: Cascade)
+  similarCompany  Company  @relation("SimilarityTarget", fields: [similarCompanyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, similarCompanyId])
+  @@index([companyId])
+  @@index([score])
+}
+
+// Semantic embeddings — for semantic search
+model SemanticEmbedding {
+  id              String   @id @default(cuid())
+  companyId       String   @unique
+  embedding       String
+  searchText      String
+  modelVersion    String   @default("default")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+}
+
+// =============================================================================
+//  Phase 8 — Production Readiness, Scale & Enterprise Polish
+// =============================================================================
+
+// Alert rules — configurable operational alerts
+model AlertRule {
+  id              String   @id @default(cuid())
+  name            String
+  metric          String
+  condition       String   @default("gt")
+  threshold       Float
+  windowMinutes   Int      @default(5)
+  isEnabled       Boolean  @default(true)
+  webhookUrl      String?
+  severity        String   @default("warning")
+  lastTriggered   DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  events          AlertEvent[]
+
+  @@index([isEnabled])
+  @@index([metric])
+}
+
+// Alert events — fired when a rule triggers
+model AlertEvent {
+  id              String   @id @default(cuid())
+  ruleId          String?
+  ruleName        String
+  metric          String
+  value           Float
+  threshold       Float
+  severity        String   @default("warning")
+  message         String
+  isAcknowledged  Boolean  @default(false)
+  acknowledgedAt  DateTime?
+  triggeredAt     DateTime @default(now())
+
+  rule AlertRule? @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+
+  @@index([triggeredAt])
+  @@index([severity])
+  @@index([isAcknowledged])
+}
+
+// Data integrity checks — track consistency check results
+model DataIntegrityCheck {
+  id              String   @id @default(cuid())
+  checkName       String
+  status          String   @default("ok")
+  issuesFound     Int      @default(0)
+  issuesRepaired  Int      @default(0)
+  details         String   @default("{}")
+  checkedAt       DateTime @default(now())
+
+  @@index([checkName])
+  @@index([status])
+  @@index([checkedAt])
+}
+
+// Dead letter jobs — jobs that failed permanently after all retries
+model DeadLetterJob {
+  id              String   @id @default(cuid())
+  originalJobType String
+  originalJobId   String?
+  payload         String
+  error           String
+  attempts        Int      @default(0)
+  maxAttempts     Int      @default(3)
+  deadLetteredAt  DateTime @default(now())
+
+  @@index([originalJobType])
+  @@index([deadLetteredAt])
+}

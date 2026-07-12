@@ -1,0 +1,182 @@
+# =============================================================================
+# Leadforge — Production Docker Compose (Oracle Cloud)
+# =============================================================================
+#
+# Server 1 (automation-server): Leadforge + PostgreSQL + Redis + RabbitMQ
+# Server 2 (automation-server-2): FreeLLM + Firecrawl (external — not here)
+#
+# Deploy: docker compose --env-file .env up -d
+# =============================================================================
+
+name: leadforge
+
+networks:
+  leadforge-net:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+  rabbitmq-data:
+  leadforge-logs:
+
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL — canonical datastore (2GB RAM, 2 CPU)
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: leadforge-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-leadforge}
+      POSTGRES_USER: ${POSTGRES_USER:-leadforge}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks: [leadforge-net]
+    mem_limit: 2g
+    cpus: 2.0
+    shm_size: 256m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-leadforge} -d ${POSTGRES_DB:-leadforge}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ---------------------------------------------------------------------------
+  # Redis — cache + rate limiting (512MB)
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: leadforge-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 384mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    networks: [leadforge-net]
+    mem_limit: 512m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # RabbitMQ — job queue (512MB)
+  # ---------------------------------------------------------------------------
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: leadforge-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-leadforge}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks: [leadforge-net]
+    mem_limit: 512m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # ---------------------------------------------------------------------------
+  # Leadforge App (Frontend + API) — port 3000 (512MB)
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.production
+    container_name: leadforge-app
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      NEXTAUTH_URL: ${NEXTAUTH_URL}
+      FREELLM_BASE_URL: ${FREELLM_BASE_URL}
+      FREELLM_API_KEY: ${FREELLM_API_KEY}
+      FREELLM_MODEL: ${FREELLM_MODEL}
+      FIRECRAWL_URL: ${FIRECRAWL_URL}
+      FIRECRAWL_API_KEY: ${FIRECRAWL_API_KEY}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "3000:3000"
+    networks: [leadforge-net]
+    mem_limit: 1g
+    cpus: 1.5
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # ---------------------------------------------------------------------------
+  # Leadforge Worker — background processing (1GB)
+  # ---------------------------------------------------------------------------
+  worker:
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.production
+    container_name: leadforge-worker
+    restart: unless-stopped
+    command: ["node", "server.js", "--worker"]
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      FREELLM_BASE_URL: ${FREELLM_BASE_URL}
+      FREELLM_API_KEY: ${FREELLM_API_KEY}
+      FREELLM_MODEL: ${FREELLM_MODEL}
+      FIRECRAWL_URL: ${FIRECRAWL_URL}
+      FIRECRAWL_API_KEY: ${FIRECRAWL_API_KEY}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DISCOVERY_WORKER_COUNT: ${DISCOVERY_WORKER_COUNT:-2}
+      DISCOVERY_CONCURRENCY: ${DISCOVERY_CONCURRENCY:-3}
+      ENRICHMENT_CONCURRENCY: ${ENRICHMENT_CONCURRENCY:-2}
+      AI_CONCURRENCY: ${AI_CONCURRENCY:-2}
+      EXPORT_CONCURRENCY: ${EXPORT_CONCURRENCY:-1}
+      WORKER_MODE: "true"
+    networks: [leadforge-net]
+    mem_limit: 1g
+    cpus: 1.0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"

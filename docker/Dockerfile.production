@@ -1,0 +1,84 @@
+# =============================================================================
+# Leadforge — Production Dockerfile (Oracle Cloud Optimized)
+# =============================================================================
+#
+# Multi-stage build optimized for:
+#  - Minimal image size (Alpine base)
+#  - Fast startup (standalone Next.js output)
+#  - Low memory usage
+#  - Automatic Prisma migrations on boot
+# =============================================================================
+
+# ---- Stage 1: Install dependencies ----
+FROM node:20-alpine AS deps
+WORKDIR /app
+
+# Install build tools for native modules
+RUN apk add --no-cache libc6-compat openssl
+
+# Copy package files
+COPY package.json bun.lock* ./
+COPY prisma ./prisma
+COPY scripts/switch-db-provider.sh ./scripts/
+
+# Switch to PostgreSQL for production
+RUN sh scripts/switch-db-provider.sh postgresql
+
+# Install dependencies
+RUN npm install --frozen-lockfile || npm install
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# ---- Stage 2: Build ----
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+RUN apk add --no-cache libc6-compat openssl
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# Disable Next.js telemetry during build
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# Build the standalone output
+RUN npx next build
+
+# ---- Stage 3: Production runtime ----
+FROM node:20-alpine AS runner
+WORKDIR /app
+
+RUN apk add --no-cache libc6-compat openssl wget
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
+USER nextjs
+
+# Copy standalone build
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+
+# Copy Prisma files for migrations
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
+
+# Copy scripts (for seed)
+COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
+
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD wget --spider -q http://localhost:3000/api/v1/health || exit 1
+
+# Start the server
+CMD ["node", "server.js"]
