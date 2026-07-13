@@ -15,7 +15,7 @@ import { getEnrichmentWorkerStatus } from "@/server/enrichment/worker/worker";
 import { checkFirecrawlHealth } from "@/server/enrichment/firecrawl-client";
 import { ensureAIWorkerStarted } from "@/server/ai/worker/bootstrap";
 import { getAIWorkerStatus } from "@/server/ai/worker/worker";
-import { getCircuitBreakerStatus } from "@/server/ai/freellm-client";
+import { getCircuitBreakerStatus, getLLMConfig } from "@/server/ai/freellm-client";
 
 export const runtime = "nodejs";
 

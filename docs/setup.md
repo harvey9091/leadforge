@@ -24,7 +24,7 @@ bun run db:seed      # creates admin user + 60 demo companies + 6 campaigns + 40
 
 # 4. Start the dev server
 bun run dev
-# → http://localhost:3000
+# → http://localhost:3001
 
 # 5. Log in with demo credentials
 # Email: admin@leadforge.local

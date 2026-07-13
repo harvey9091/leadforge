@@ -3,7 +3,7 @@
 # =============================================================================
 #
 # Multi-stage build for the Next.js dashboard.
-# Output: standalone Next.js server on port 3000.
+# Output: standalone Next.js server on port 3001.
 # =============================================================================
 
 # ---- Stage 1: deps ----
@@ -56,10 +56,10 @@ COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modul
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV PORT=3000
+ENV PORT=3001
 ENV HOSTNAME=0.0.0.0
 
-EXPOSE 3000
+EXPOSE 3001
 
 # Run migrations on boot, then start the server
 CMD ["node", "server.js"]

@@ -17,17 +17,17 @@ leadforge.example.com {
 
 	# Health check endpoint — used by Docker healthchecks
 	handle /api/v1/health {
-		reverse_proxy dashboard:3000
+		reverse_proxy dashboard:3001
 	}
 
 	# API (Phase 2: routes to api:3001)
 	handle /api/* {
-		reverse_proxy dashboard:3000
+		reverse_proxy dashboard:3001
 	}
 
 	# Dashboard
 	handle {
-		reverse_proxy dashboard:3000
+		reverse_proxy dashboard:3001
 	}
 
 	# Security headers
@@ -52,5 +52,5 @@ leadforge.example.com {
 # Development — HTTP only
 localhost {
 	encode gzip zstd
-	reverse_proxy dashboard:3000
+	reverse_proxy dashboard:3001
 }

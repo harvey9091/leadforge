@@ -1,0 +1,75 @@
+# =============================================================================
+# Leadforge Worker — Production Dockerfile
+# =============================================================================
+#
+# Runs only the background workers. No HTTP server.
+# Reuses the Next.js standalone output so worker code, Prisma client,
+# and business logic stay in a single source tree.
+# =============================================================================
+
+FROM node:20-alpine AS deps
+WORKDIR /app
+
+RUN apk add --no-cache libc6-compat openssl
+
+COPY package.json bun.lock* ./
+COPY prisma ./prisma
+COPY scripts/switch-db-provider.sh ./scripts/
+
+RUN sh scripts/switch-db-provider.sh postgresql
+
+RUN npm install --frozen-lockfile || npm install
+RUN npx prisma generate
+
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+RUN apk add --no-cache libc6-compat openssl
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# Switch Prisma provider to PostgreSQL
+RUN sh scripts/switch-db-provider.sh postgresql
+
+# Provide safe defaults so `env.ts` doesn't throw during Next.js static analysis
+ENV NEXT_TELEMETRY_DISABLED=1 \
+    NODE_ENV=production \
+    DATABASE_URL="postgresql://user:pass@localhost:5432/leadforge" \
+    REDIS_URL="redis://localhost:6379" \
+    RABBITMQ_URL="amqp://user:pass@localhost:5672" \
+    JWT_SECRET="build-time-secret-not-for-production" \
+    APP_URL="http://localhost:3001" \
+    FREELLM_BASE_URL="http://localhost:3002/v1" \
+    FREELLM_API_KEY="build-time-key" \
+    FREELLM_MODEL="default" \
+    FIRECRAWL_URL="http://localhost:3003" \
+    FIRECRAWL_API_KEY="build-time-key"
+
+RUN npx next build
+
+FROM node:20-alpine AS runner
+WORKDIR /app
+
+RUN apk add --no-cache libc6-compat openssl wget
+
+RUN addgroup -g 1001 -S nodejs && adduser -S worker -u 1001
+USER worker
+
+COPY --from=builder --chown=worker:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=worker:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=worker:nodejs /app/public ./public
+COPY --from=builder --chown=worker:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=worker:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=worker:nodejs /app/tsconfig.json ./tsconfig.json
+COPY --from=builder --chown=worker:nodejs /app/scripts ./scripts
+COPY --from=builder --chown=worker:nodejs /app/workers ./workers
+COPY --from=builder --chown=worker:nodejs /app/src ./src
+COPY --from=builder --chown=worker:nodejs /app/package.json ./package.json
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+EXPOSE 3001
+
+CMD ["node_modules/.bin/tsx", "workers/src/entrypoint.ts"]

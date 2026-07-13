@@ -21,6 +21,7 @@
  * =============================================================================
  */
 
+import { env } from "@/server/config/env";
 import { db } from "@/lib/db";
 import { logger } from "@/server/utils/logger";
 import { eventBus } from "@/server/events/event-bus";
@@ -37,9 +38,9 @@ import {
 } from "@/server/repositories/enrichment.repository";
 import type { CrawledPage } from "../firecrawl-client";
 
-const POLL_INTERVAL_MS = 15_000; // 15 seconds — less aggressive than discovery
-const HEARTBEAT_TIMEOUT_MS = 180_000; // 3 minutes
-const MAX_CONCURRENT_JOBS = 1;
+const POLL_INTERVAL_MS = env.worker.enrichmentPollIntervalMs;
+const HEARTBEAT_TIMEOUT_MS = env.worker.enrichmentHeartbeatTimeoutMs;
+const MAX_CONCURRENT_JOBS = env.worker.enrichmentConcurrency;
 
 const PAGE_TYPES = [
   { path: "", type: "HOMEPAGE" },

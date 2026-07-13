@@ -52,7 +52,7 @@
 
 ```bash
 # Development
-bun run dev              # Start dev server on http://localhost:3000
+bun run dev              # Start dev server on http://localhost:3001
 bun run lint             # ESLint check
 bun run db:push          # Sync Prisma schema to database
 bun run db:generate      # Regenerate Prisma client (after schema changes)

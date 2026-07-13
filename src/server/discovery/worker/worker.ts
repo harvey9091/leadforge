@@ -29,6 +29,8 @@
  * =============================================================================
  */
 
+import { env } from "@/server/config/env";
+
 import { db } from "@/lib/db";
 import { logger } from "@/server/utils/logger";
 import { eventBus } from "@/server/events/event-bus";
@@ -50,8 +52,9 @@ import type {
 } from "../types";
 import type { SourceType } from "@prisma/client";
 
-const POLL_INTERVAL_MS = 5_000;
-const HEARTBEAT_TIMEOUT_MS = 60_000; // a job with no heartbeat for 60s is stale
+const POLL_INTERVAL_MS = env.worker.discoveryPollIntervalMs;
+const HEARTBEAT_TIMEOUT_MS = env.worker.discoveryHeartbeatTimeoutMs;
+const MAX_CONCURRENT_JOBS = env.worker.discoveryConcurrency;
 
 // Worker ID is generated lazily to avoid using process.pid at module load time
 // (Edge Runtime compatibility).
@@ -136,7 +139,7 @@ async function poll(): Promise<void> {
     // 3. Process each pending job (limited concurrency)
     for (const job of pending) {
       if (activeJobs.has(job.id)) continue;
-      if (activeJobs.size >= 3) break; // max 3 concurrent jobs
+      if (activeJobs.size >= MAX_CONCURRENT_JOBS) break;
 
       activeJobs.add(job.id);
       void processJob(job.id).finally(() => {

@@ -155,7 +155,7 @@ cp .env.example .env
 docker compose --env-file .env up -d
 
 # 4. Verify
-curl http://localhost:3000/api/v1/health
+curl http://localhost:3001/api/v1/health
 
 # 5. Seed admin user (first deploy only)
 docker compose exec frontend npx prisma db push
@@ -235,7 +235,7 @@ bun run db:seed
 # Start dev server
 bun run dev
 
-# Open http://localhost:3000
+# Open http://localhost:3001
 # Login: admin@leadforge.local / Leadforge123
 ```
 

@@ -34,14 +34,14 @@ docker compose --env-file .env up -d
 docker compose ps
 
 # 6. Verify
-curl http://localhost:3000/api/v1/health
+curl http://localhost:3001/api/v1/health
 
 # 7. Seed admin user (first deploy only)
 docker compose exec frontend npx prisma db push
 docker compose exec frontend node scripts/seed.js
 
 # 8. Access the app
-open http://your-server-ip:3000
+open http://your-server-ip:3001
 ```
 
 ## Environment Configuration
@@ -52,12 +52,15 @@ open http://your-server-ip:3000
 |----------|-------------|
 | `DATABASE_URL` | PostgreSQL connection string |
 | `JWT_SECRET` | JWT signing secret (min 32 chars) |
-| `NEXTAUTH_SECRET` | NextAuth secret |
+| `APP_URL` | Public URL of the application |
 | `FREELLM_BASE_URL` | FreeLLM API URL on Server 2 |
 | `FREELLM_API_KEY` | FreeLLM API key |
 | `FIRECRAWL_URL` | Firecrawl URL on Server 2 |
 | `POSTGRES_PASSWORD` | PostgreSQL password |
 | `RABBITMQ_PASSWORD` | RabbitMQ password |
+| `DISCOVERY_CONCURRENCY` | Concurrent discovery jobs (default: 3) |
+| `ENRICHMENT_CONCURRENCY` | Concurrent enrichment jobs (default: 2) |
+| `AI_CONCURRENCY` | Concurrent AI analysis jobs (default: 2) |
 
 ### FreeLLM Configuration
 
@@ -103,7 +106,7 @@ Remaining ~4-5 GB for OS and overhead on 11 GB RAM server.
 
 | Port | Service | Access |
 |------|---------|--------|
-| 3000 | Leadforge Frontend + API | Public |
+| 3001 | Leadforge Frontend + API | Public |
 | 5432 | PostgreSQL | Internal only |
 | 6379 | Redis | Internal only |
 | 5672 | RabbitMQ | Internal only |
@@ -130,7 +133,7 @@ docker compose exec frontend npx prisma db push
 docker compose up -d
 
 # 5. Verify
-curl http://localhost:3000/api/v1/health
+curl http://localhost:3001/api/v1/health
 ```
 
 ### Rolling Restart (zero downtime)
@@ -150,7 +153,7 @@ docker compose up -d --no-deps --build worker
 docker compose exec postgres pg_dump -U leadforge leadforge | gzip > /opt/backups/leadforge_$(date +%Y%m%d_%H%M%S).sql.gz
 
 # Or use the built-in API
-curl -X POST http://localhost:3000/api/v1/optimization/backup
+curl -X POST http://localhost:3001/api/v1/optimization/backup
 ```
 
 ### Automated Backup (crontab)
@@ -203,13 +206,13 @@ docker compose exec frontend npx prisma db push
 docker compose ps
 
 # Health endpoint
-curl http://localhost:3000/api/v1/health
+curl http://localhost:3001/api/v1/health
 
 # Observability
-curl http://localhost:3000/api/v1/observability
+curl http://localhost:3001/api/v1/observability
 
 # Active alerts
-curl http://localhost:3000/api/v1/alerts/events
+curl http://localhost:3001/api/v1/alerts/events
 ```
 
 ### View Logs
@@ -236,7 +239,7 @@ docker compose logs --tail 100 frontend
 docker compose logs worker | tail -20
 
 # Check for stuck jobs
-curl -X POST http://localhost:3000/api/v1/integrity -H "Content-Type: application/json" -d '{"repair":true}'
+curl -X POST http://localhost:3001/api/v1/integrity -H "Content-Type: application/json" -d '{"repair":true}'
 
 # Restart worker
 docker compose restart worker
@@ -262,7 +265,7 @@ docker compose exec frontend env | grep FREELLM
 docker compose exec postgres psql -U leadforge -c "SELECT 1"
 
 # Run integrity checks
-curl -X POST http://localhost:3000/api/v1/integrity
+curl -X POST http://localhost:3001/api/v1/integrity
 
 # Vacuum
 docker compose exec postgres vacuumdb -U leadforge --all

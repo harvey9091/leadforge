@@ -87,7 +87,7 @@ services:
       start_period: 30s
 
   # ---------------------------------------------------------------------------
-  # Leadforge App (Frontend + API) — port 3000 (512MB)
+  # Leadforge App (Frontend + API) — port 3001
   # ---------------------------------------------------------------------------
   frontend:
     build:
@@ -102,16 +102,21 @@ services:
       REDIS_URL: ${REDIS_URL}
       RABBITMQ_URL: ${RABBITMQ_URL}
       JWT_SECRET: ${JWT_SECRET}
-      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
-      NEXTAUTH_URL: ${NEXTAUTH_URL}
+      APP_URL: ${APP_URL}
       FREELLM_BASE_URL: ${FREELLM_BASE_URL}
       FREELLM_API_KEY: ${FREELLM_API_KEY}
       FREELLM_MODEL: ${FREELLM_MODEL}
       FIRECRAWL_URL: ${FIRECRAWL_URL}
       FIRECRAWL_API_KEY: ${FIRECRAWL_API_KEY}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      DISCOVERY_POLL_INTERVAL_MS: ${DISCOVERY_POLL_INTERVAL_MS:-5000}
+      DISCOVERY_HEARTBEAT_TIMEOUT_MS: ${DISCOVERY_HEARTBEAT_TIMEOUT_MS:-60000}
+      ENRICHMENT_POLL_INTERVAL_MS: ${ENRICHMENT_POLL_INTERVAL_MS:-15000}
+      ENRICHMENT_HEARTBEAT_TIMEOUT_MS: ${ENRICHMENT_HEARTBEAT_TIMEOUT_MS:-180000}
+      AI_POLL_INTERVAL_MS: ${AI_POLL_INTERVAL_MS:-10000}
+      AI_HEARTBEAT_TIMEOUT_MS: ${AI_HEARTBEAT_TIMEOUT_MS:-180000}
     ports:
-      - "3000:3000"
+      - "3001:3001"
     networks: [leadforge-net]
     mem_limit: 1g
     cpus: 1.5
@@ -123,7 +128,7 @@ services:
       rabbitmq:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/v1/health"]
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3001/api/v1/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -135,15 +140,15 @@ services:
         max-file: "5"
 
   # ---------------------------------------------------------------------------
-  # Leadforge Worker — background processing (1GB)
+  # Leadforge Worker — background processing only (no HTTP server)
   # ---------------------------------------------------------------------------
   worker:
     build:
       context: .
-      dockerfile: ./docker/Dockerfile.production
+      dockerfile: ./docker/Dockerfile.worker
     container_name: leadforge-worker
     restart: unless-stopped
-    command: ["node", "server.js", "--worker"]
+    command: ["node_modules/.bin/tsx", "workers/src/entrypoint.ts"]
     env_file: .env
     environment:
       NODE_ENV: production
@@ -151,6 +156,7 @@ services:
       REDIS_URL: ${REDIS_URL}
       RABBITMQ_URL: ${RABBITMQ_URL}
       JWT_SECRET: ${JWT_SECRET}
+      APP_URL: ${APP_URL}
       FREELLM_BASE_URL: ${FREELLM_BASE_URL}
       FREELLM_API_KEY: ${FREELLM_API_KEY}
       FREELLM_MODEL: ${FREELLM_MODEL}
@@ -159,8 +165,14 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       DISCOVERY_WORKER_COUNT: ${DISCOVERY_WORKER_COUNT:-2}
       DISCOVERY_CONCURRENCY: ${DISCOVERY_CONCURRENCY:-3}
+      DISCOVERY_POLL_INTERVAL_MS: ${DISCOVERY_POLL_INTERVAL_MS:-5000}
+      DISCOVERY_HEARTBEAT_TIMEOUT_MS: ${DISCOVERY_HEARTBEAT_TIMEOUT_MS:-60000}
       ENRICHMENT_CONCURRENCY: ${ENRICHMENT_CONCURRENCY:-2}
+      ENRICHMENT_POLL_INTERVAL_MS: ${ENRICHMENT_POLL_INTERVAL_MS:-15000}
+      ENRICHMENT_HEARTBEAT_TIMEOUT_MS: ${ENRICHMENT_HEARTBEAT_TIMEOUT_MS:-180000}
       AI_CONCURRENCY: ${AI_CONCURRENCY:-2}
+      AI_POLL_INTERVAL_MS: ${AI_POLL_INTERVAL_MS:-10000}
+      AI_HEARTBEAT_TIMEOUT_MS: ${AI_HEARTBEAT_TIMEOUT_MS:-180000}
       EXPORT_CONCURRENCY: ${EXPORT_CONCURRENCY:-1}
       WORKER_MODE: "true"
     networks: [leadforge-net]
@@ -172,8 +184,6 @@ services:
       redis:
         condition: service_healthy
       rabbitmq:
-        condition: service_healthy
-      frontend:
         condition: service_healthy
     logging:
       driver: json-file

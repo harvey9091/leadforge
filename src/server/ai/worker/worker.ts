@@ -19,6 +19,7 @@
  * =============================================================================
  */
 
+import { env } from "@/server/config/env";
 import { db } from "@/lib/db";
 import { logger } from "@/server/utils/logger";
 import { eventBus } from "@/server/events/event-bus";
@@ -32,9 +33,9 @@ import {
   promptCacheRepository,
 } from "@/server/repositories/ai.repository";
 
-const POLL_INTERVAL_MS = 10_000;
-const HEARTBEAT_TIMEOUT_MS = 180_000;
-const MAX_CONCURRENT_JOBS = 1; // AI calls are expensive — 1 at a time
+const POLL_INTERVAL_MS = env.worker.aiPollIntervalMs;
+const HEARTBEAT_TIMEOUT_MS = env.worker.aiHeartbeatTimeoutMs;
+const MAX_CONCURRENT_JOBS = env.worker.aiConcurrency;
 
 let workerStarted = false;
 let pollHandle: ReturnType<typeof setInterval> | null = null;

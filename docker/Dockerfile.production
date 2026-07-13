@@ -39,8 +39,22 @@ RUN apk add --no-cache libc6-compat openssl
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Disable Next.js telemetry during build
-ENV NEXT_TELEMETRY_DISABLED=1
+# Switch Prisma provider to PostgreSQL (overwrites any src copy)
+RUN sh scripts/switch-db-provider.sh postgresql
+
+# Provide safe defaults so `env.ts` doesn't throw during Next.js static analysis
+ENV NEXT_TELEMETRY_DISABLED=1 \
+    NODE_ENV=production \
+    DATABASE_URL="postgresql://user:pass@localhost:5432/leadforge" \
+    REDIS_URL="redis://localhost:6379" \
+    RABBITMQ_URL="amqp://user:pass@localhost:5672" \
+    JWT_SECRET="build-time-secret-not-for-production" \
+     APP_URL="http://localhost:3001" \
+    FREELLM_BASE_URL="http://localhost:3002/v1" \
+    FREELLM_API_KEY="build-time-key" \
+    FREELLM_MODEL="default" \
+    FIRECRAWL_URL="http://localhost:3003" \
+    FIRECRAWL_API_KEY="build-time-key"
 
 # Build the standalone output
 RUN npx next build
@@ -60,25 +74,28 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
-# Copy Prisma files for migrations
+# Copy Prisma files for runtime migrations/seed
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 
-# Copy scripts (for seed)
+# Copy scripts (bootstrap + seed)
 COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV PORT=3000
+ENV PORT=3001
 ENV HOSTNAME=0.0.0.0
 
-EXPOSE 3000
+EXPOSE 3001
+
+# Entrypoint: bootstrap database on first boot, then start Next.js
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-  CMD wget --spider -q http://localhost:3000/api/v1/health || exit 1
+  CMD wget --spider -q http://localhost:3001/api/v1/health || exit 1
 
 # Start the server
 CMD ["node", "server.js"]

@@ -4,7 +4,7 @@
 
 set -e
 
-BASE="http://localhost:3000"
+BASE="http://localhost:3001"
 echo "=== Phase 2.5 + Phase 3 Verification ==="
 echo ""
 

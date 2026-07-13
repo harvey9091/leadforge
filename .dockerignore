@@ -8,10 +8,8 @@ server.log
 !README.md
 docs
 tests
-scripts
 apps
 services
-workers
 packages
 docker
 upload

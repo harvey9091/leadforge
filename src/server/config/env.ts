@@ -9,12 +9,13 @@
  */
 
 function required(name: string, fallback?: string): string {
-  const value = (typeof process !== "undefined" ? process.env[name] : undefined) ?? fallback;
-  if (!value) {
+  const raw = typeof process !== "undefined" ? process.env[name] : undefined;
+  const value = raw ?? fallback;
+  if (value === undefined || value === null) {
     if (typeof process !== "undefined" && process.env.NODE_ENV === "production") {
       throw new Error(`Missing required env var: ${name}`);
     }
-    return fallback ?? "";
+    return "";
   }
   return value;
 }
@@ -37,7 +38,7 @@ export const env = {
   app: {
     name: "Leadforge",
     version: "8.0.0-production",
-    url: required("APP_URL", "http://localhost:3000"),
+    url: required("APP_URL", "http://localhost:3001"),
   },
 
   jwt: {
@@ -83,8 +84,14 @@ export const env = {
   worker: {
     discoveryCount: int("DISCOVERY_WORKER_COUNT", 2),
     discoveryConcurrency: int("DISCOVERY_CONCURRENCY", 3),
+    discoveryPollIntervalMs: int("DISCOVERY_POLL_INTERVAL_MS", 5_000),
+    discoveryHeartbeatTimeoutMs: int("DISCOVERY_HEARTBEAT_TIMEOUT_MS", 60_000),
     enrichmentConcurrency: int("ENRICHMENT_CONCURRENCY", 2),
+    enrichmentPollIntervalMs: int("ENRICHMENT_POLL_INTERVAL_MS", 15_000),
+    enrichmentHeartbeatTimeoutMs: int("ENRICHMENT_HEARTBEAT_TIMEOUT_MS", 180_000),
     aiConcurrency: int("AI_CONCURRENCY", 2),
+    aiPollIntervalMs: int("AI_POLL_INTERVAL_MS", 10_000),
+    aiHeartbeatTimeoutMs: int("AI_HEARTBEAT_TIMEOUT_MS", 180_000),
     exportConcurrency: int("EXPORT_CONCURRENCY", 1),
   },
 
