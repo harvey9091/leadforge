@@ -8,8 +8,8 @@ import { apiSuccess, getRequestContext } from "@/server/utils/api";
 
 export const runtime = "nodejs";
 
-export async function GET() {
-  const ctx = getRequestContext();
+export async function GET(req: Request) {
+  const ctx = getRequestContext(req);
   try {
     const health = await integrationManager.checkAllHealth(true);
     const integrations = integrationManager.getAll();

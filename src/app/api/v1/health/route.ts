@@ -46,7 +46,7 @@ export async function GET(req: Request) {
   const [discoveryQueue, enrichmentQueue, aiQueue] = await Promise.all([
     db.discoveryJob.count({ where: { status: { in: ["QUEUED", "RETRYING"] } } }),
     db.enrichmentJob.count({ where: { status: { in: ["QUEUED", "RETRYING"] } } }),
-    db.aiAnalysis.count({ where: { status: { in: ["QUEUED", "RETRYING"] } } }),
+    db.aIAnalysis.count({ where: { status: { in: ["QUEUED", "RETRYING"] } } }),
   ]);
 
   // Discovery worker
@@ -96,9 +96,9 @@ export async function GET(req: Request) {
     services.freellm = {
       status: llmConfig.baseUrl && llmConfig.apiKey ? (circuitBreaker.isOpen ? "degraded" : "up") : "down",
       details: !llmConfig.baseUrl
-        ? "FREELLM_BASE_URL not configured"
+        ? "FreeLLM base URL not configured — set in Settings > Infrastructure"
         : !llmConfig.apiKey
-        ? "FREELLM_API_KEY not configured"
+        ? "FreeLLM API key not configured — set in Settings > Infrastructure"
         : circuitBreaker.isOpen
         ? `Circuit breaker open — resets in ${Math.ceil(circuitBreaker.resetIn / 1000)}s`
         : `Connected to ${llmConfig.baseUrl}`,

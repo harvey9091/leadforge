@@ -8,8 +8,8 @@ import { apiSuccess, apiError, getRequestContext } from "@/server/utils/api";
 
 export const runtime = "nodejs";
 
-export async function POST() {
-  const ctx = getRequestContext();
+export async function POST(req: Request) {
+  const ctx = getRequestContext(req);
   try {
     const results = await integrationManager.validateAll();
     const errors = results.filter((r) => !r.valid);

@@ -22,6 +22,7 @@
  */
 
 import { logger } from "@/server/utils/logger";
+import { env } from "@/server/config/env";
 
 export interface LLMConfig {
   model: string;
@@ -86,13 +87,13 @@ export async function getLLMConfig(): Promise<LLMConfig> {
     };
   }
   return {
-    model: process.env.FREELLM_MODEL ?? "default",
-    temperature: parseFloat(process.env.AI_TEMPERATURE ?? "0.3"),
-    maxTokens: parseInt(process.env.AI_MAX_TOKENS ?? "4000", 10),
-    timeout: parseInt(process.env.AI_TIMEOUT ?? "60000", 10),
-    retries: parseInt(process.env.AI_RETRIES ?? "3", 10),
-    baseUrl: process.env.FREELLM_BASE_URL ?? "",
-    apiKey: process.env.FREELLM_API_KEY ?? "",
+    model: env.freellm.model,
+    temperature: parseFloat(env.freellm.baseUrl ? "0.3" : "0.3"),
+    maxTokens: 4000,
+    timeout: 60000,
+    retries: parseInt(env.freellm.baseUrl ? "3" : "3", 10),
+    baseUrl: env.freellm.baseUrl,
+    apiKey: env.freellm.apiKey,
   };
 }
 

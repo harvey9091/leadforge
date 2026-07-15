@@ -19,6 +19,7 @@ import { db } from "@/lib/db";
 import { FreeLLMConfig } from "@prisma/client";
 import { randomBytes, createCipheriv, createDecipheriv } from "node:crypto";
 import { integrationManager } from "@/server/integrations/manager";
+import { env } from "@/server/config/env";
 
 let _cachedConfig: { baseUrl: string; apiKey: string; model: string; temperature: number; maxTokens: number; timeout: number; streaming: boolean } | null = null;
 let _cacheTimestamp = 0;
@@ -145,12 +146,12 @@ export async function loadFreeLLMConfig(): Promise<{
   }
 
   _cachedConfig = {
-    baseUrl: process.env.FREELLM_BASE_URL ?? "",
-    apiKey: process.env.FREELLM_API_KEY ?? "",
-    model: process.env.FREELLM_MODEL ?? "default",
-    temperature: parseFloat(process.env.AI_TEMPERATURE ?? "0.3"),
-    maxTokens: parseInt(process.env.AI_MAX_TOKENS ?? "4000", 10),
-    timeout: parseInt(process.env.AI_TIMEOUT ?? "60000", 10),
+    baseUrl: env.freellm.baseUrl,
+    apiKey: env.freellm.apiKey,
+    model: env.freellm.model,
+    temperature: parseFloat(env.freellm.baseUrl ? "0.3" : "0.3"),
+    maxTokens: 4000,
+    timeout: 60000,
     streaming: false,
   };
   _cacheTimestamp = now;
