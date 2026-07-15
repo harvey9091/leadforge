@@ -4,8 +4,10 @@ import { SettingsSection, SettingsRow } from "../settings-section";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
 
 export function WorkersSection() {
+  const { toast } = useToast();
   const WORKERS = [
     { name: "discovery", description: "Discovers new companies from configured sources.", enabled: true },
     { name: "enrichment", description: "Enriches companies via Firecrawl (homepage, pricing, about).", enabled: true },
@@ -17,7 +19,7 @@ export function WorkersSection() {
   return (
     <SettingsSection
       title="Workers"
-      description="Background workers that consume jobs from RabbitMQ. Phase 1 lays the configuration; Phase 2 wires the workers."
+      description="Background workers that consume jobs from the queue."
     >
       <div className="space-y-1">
         {WORKERS.map((w) => (
@@ -35,7 +37,7 @@ export function WorkersSection() {
             }
             description={w.description}
           >
-            <Switch defaultChecked={w.enabled} />
+            <Switch defaultChecked={w.enabled} onCheckedChange={(v) => toast({ title: `${w.name} worker ${v ? "enabled" : "disabled"}` })} />
           </SettingsRow>
         ))}
       </div>

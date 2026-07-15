@@ -21,6 +21,7 @@ import { ApiKeysSection } from "@/features/settings/sections/api-keys";
 import { IntegrationsSection } from "@/features/settings/sections/integrations";
 import { WorkersSection } from "@/features/settings/sections/workers";
 import { SystemSection } from "@/features/settings/sections/system";
+import { FreeLLMSection } from "@/features/settings/sections/freellm";
 
 export function SettingsPage() {
   const route = useHashRoute();
@@ -69,6 +70,7 @@ export function SettingsPage() {
           {activeId === "settings.appearance" && <AppearanceSection />}
           {activeId === "settings.api-keys" && <ApiKeysSection />}
           {activeId === "settings.integrations" && <IntegrationsSection />}
+          {activeId === "settings.freellm" && <FreeLLMSection />}
           {activeId === "settings.workers" && <WorkersSection />}
           {activeId === "settings.system" && <SystemSection />}
           {(activeId === "settings" || !activeId.startsWith("settings.")) && <GeneralSection />}

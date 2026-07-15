@@ -219,7 +219,7 @@ async function processSingleJob(jobId: string, companyId: string | null): Promis
   const userPrompt = buildUserPrompt(ctx);
   const promptHash = hashPrompt(systemPrompt, userPrompt);
   const websiteHash = hashWebsiteContent(ctx);
-  const config = getLLMConfig();
+  const config = await getLLMConfig();
   const cacheKey = `${companyId}:${websiteHash}:${promptHash}:${config.model}`;
 
   // Check cache
@@ -322,23 +322,14 @@ async function storeResults(
   websiteHash: string,
   modelVersion: string
 ): Promise<void> {
-  // Get the existing analysis record (created in processSingleJob)
-  const analysis = await db.aIAnalysis.findFirst({
+  let analysis = await db.aIAnalysis.findFirst({
     where: { companyId, status: "processing" },
     orderBy: { createdAt: "desc" },
   });
 
   if (!analysis) {
-    // Create one if it doesn't exist (e.g. from cache)
-    await aiAnalysisRepository.create(companyId, promptHash, websiteHash, modelVersion);
+    analysis = await aiAnalysisRepository.create(companyId, promptHash, websiteHash, modelVersion);
   }
 
-  const analysisId = analysis?.id ?? (await db.aIAnalysis.findFirst({
-    where: { companyId },
-    orderBy: { createdAt: "desc" },
-  }))?.id;
-
-  if (!analysisId) throw new Error("Could not get analysis ID");
-
-  await aiAnalysisRepository.setResults(analysisId, result, tokensUsed, durationMs);
+  await aiAnalysisRepository.setResults(analysis.id, result, tokensUsed, durationMs);
 }

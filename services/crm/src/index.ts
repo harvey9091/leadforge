@@ -6,7 +6,7 @@
  * Lightweight CRM layer for managing outreach and relationships.
  *
  * Phase 1: not implemented. The architecture doc defers CRM logic to a
- * later phase; Phase 1 only models the entities (Campaign, Outreach).
+ * later phase.
  *
  * Phase 2 will add:
  *  - Campaign sequencing (multi-step outreach)

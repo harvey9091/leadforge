@@ -11,11 +11,11 @@ import {
   Users2,
   Building2,
   Contact2,
-  Megaphone,
   BarChart3,
   Sparkles,
   Activity,
   Settings,
+  KeyRound,
   type LucideIcon,
 } from "lucide-react";
 import type { RouteId } from "@/lib/routes";
@@ -85,12 +85,6 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "Outreach",
     items: [
       {
-        id: "campaigns",
-        label: "Campaigns",
-        icon: Megaphone,
-        shortcut: "G M",
-      },
-      {
         id: "analytics",
         label: "Analytics",
         icon: BarChart3,
@@ -138,8 +132,9 @@ export const SETTINGS_SUBNAV: NavItem[] = [
   { id: "settings.general", label: "General", icon: Settings },
   { id: "settings.profile", label: "Profile", icon: Contact2 },
   { id: "settings.appearance", label: "Appearance", icon: BarChart3 },
-  { id: "settings.api-keys", label: "API Keys", icon: Megaphone },
+  { id: "settings.api-keys", label: "API Keys", icon: KeyRound },
   { id: "settings.integrations", label: "Integrations", icon: Sparkles, soon: true },
+  { id: "settings.freellm", label: "FreeLLM", icon: Sparkles },
   { id: "settings.workers", label: "Workers", icon: Activity, soon: true },
   { id: "settings.system", label: "System", icon: Activity },
 ];

@@ -23,7 +23,6 @@ export type RouteId =
   | "company"
   | "compare"
   | "people"
-  | "campaigns"
   | "analytics"
   | "ai-insights"
   | "feed"
@@ -34,6 +33,7 @@ export type RouteId =
   | "settings.appearance"
   | "settings.api-keys"
   | "settings.integrations"
+  | "settings.freellm"
   | "settings.workers"
   | "settings.system"
   | "404";
@@ -139,23 +139,15 @@ export const ROUTES: Record<RouteId, RouteMeta> = {
     protected: true,
     shell: true,
   },
-  people: {
-    id: "people",
-    path: "/people",
-    title: "People — Leadforge",
-    description: "Contacts discovered and verified.",
-    protected: true,
-    shell: true,
-  },
-  campaigns: {
-    id: "campaigns",
-    path: "/campaigns",
-    title: "Campaigns — Leadforge",
-    description: "Outreach campaigns and sequences.",
-    protected: true,
-    shell: true,
-  },
-  analytics: {
+   people: {
+     id: "people",
+     path: "/people",
+     title: "People — Leadforge",
+     description: "Contacts discovered and verified.",
+     protected: true,
+     shell: true,
+   },
+   analytics: {
     id: "analytics",
     path: "/analytics",
     title: "Analytics — Leadforge",
@@ -232,6 +224,14 @@ export const ROUTES: Record<RouteId, RouteMeta> = {
     path: "/settings/integrations",
     title: "Integrations — Leadforge",
     description: "Connect external services.",
+    protected: true,
+    shell: true,
+  },
+  "settings.freellm": {
+    id: "settings.freellm",
+    path: "/settings/freellm",
+    title: "FreeLLM API — Leadforge",
+    description: "Configure the FreeLLM gateway for AI qualification.",
     protected: true,
     shell: true,
   },

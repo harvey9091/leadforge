@@ -6,9 +6,12 @@
  * Connects to the external FreeLLM API (OpenAI-compatible) running on
  * Server 2 (automation-server-2). Never installs AI services locally.
  *
- * Configuration (from environment):
+ * Configuration (from environment or database):
  *   FREELLM_BASE_URL  — e.g. http://your-server-2:3002/v1
  *   FREELLM_API_KEY   — API key (never hardcoded)
+ *
+ * Database config (set via Settings > FreeLLM) takes precedence over
+ * environment variables.
  *
  * Features:
  *  - Retry with exponential backoff
@@ -33,7 +36,58 @@ export interface LLMConfig {
   apiKey: string;
 }
 
-export function getLLMConfig(): LLMConfig {
+let _dbConfig: { baseUrl: string; apiKey: string; model: string; temperature: number; maxTokens: number; timeout: number; streaming: boolean } | null = null;
+let _dbConfigLoaded = false;
+
+async function loadDbConfig(): Promise<{ baseUrl: string; apiKey: string; model: string; temperature: number; maxTokens: number; timeout: number } | null> {
+  if (_dbConfigLoaded) {
+    if (_dbConfig && (_dbConfig.baseUrl || _dbConfig.apiKey)) {
+      return {
+        baseUrl: _dbConfig.baseUrl,
+        apiKey: _dbConfig.apiKey,
+        model: _dbConfig.model,
+        temperature: _dbConfig.temperature,
+        maxTokens: _dbConfig.maxTokens,
+        timeout: _dbConfig.timeout,
+      };
+    }
+    return null;
+  }
+  try {
+    const { loadFreeLLMConfig } = await import("./freellm-settings");
+    const cfg = await loadFreeLLMConfig();
+    if (cfg.baseUrl || cfg.apiKey) {
+      _dbConfig = cfg;
+      _dbConfigLoaded = true;
+      return {
+        baseUrl: cfg.baseUrl,
+        apiKey: cfg.apiKey,
+        model: cfg.model,
+        temperature: cfg.temperature,
+        maxTokens: cfg.maxTokens,
+        timeout: cfg.timeout,
+      };
+    }
+  } catch {
+    // DB not available
+  }
+  _dbConfigLoaded = true;
+  return null;
+}
+
+export async function getLLMConfig(): Promise<LLMConfig> {
+  const dbCfg = await loadDbConfig();
+  if (dbCfg) {
+    return {
+      model: dbCfg.model,
+      temperature: dbCfg.temperature,
+      maxTokens: dbCfg.maxTokens,
+      timeout: dbCfg.timeout,
+      retries: parseInt(process.env.AI_RETRIES ?? "3", 10),
+      baseUrl: dbCfg.baseUrl,
+      apiKey: dbCfg.apiKey,
+    };
+  }
   return {
     model: process.env.FREELLM_MODEL ?? "default",
     temperature: parseFloat(process.env.AI_TEMPERATURE ?? "0.3"),
@@ -93,7 +147,7 @@ export async function callFreeLLM(
   userPrompt: string,
   config?: Partial<LLMConfig>
 ): Promise<LLMResult> {
-  const fullConfig = { ...getLLMConfig(), ...config };
+  const fullConfig = { ...await getLLMConfig(), ...config };
 
   if (!fullConfig.baseUrl) {
     throw new Error("FREELLM_BASE_URL not configured — cannot call FreeLLM");
@@ -187,7 +241,7 @@ export async function callFreeLLMForJSON<T>(
   userPrompt: string,
   config?: Partial<LLMConfig>
 ): Promise<{ data: T; tokensUsed: number; durationMs: number; raw: string }> {
-  const fullConfig = { ...getLLMConfig(), ...config };
+  const fullConfig = await getLLMConfig();
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt <= fullConfig.retries; attempt++) {
@@ -228,7 +282,7 @@ export async function* streamFreeLLM(
   userPrompt: string,
   config?: Partial<LLMConfig>
 ): AsyncGenerator<string, void, void> {
-  const fullConfig = { ...getLLMConfig(), ...config };
+  const fullConfig = { ...await getLLMConfig(), ...config };
   if (!fullConfig.baseUrl || !fullConfig.apiKey) {
     throw new Error("FreeLLM not configured");
   }
@@ -330,6 +384,7 @@ function estimateTokens(text: string): number {
 export async function testConnection(): Promise<{
   success: boolean;
   latencyMs?: number;
+  model?: string;
   error?: string;
 }> {
   try {
@@ -342,6 +397,7 @@ export async function testConnection(): Promise<{
     return {
       success: true,
       latencyMs: Date.now() - start,
+      model: result.model,
     };
   } catch (err) {
     return {
@@ -349,6 +405,14 @@ export async function testConnection(): Promise<{
       error: err instanceof Error ? err.message : String(err),
     };
   }
+}
+
+/**
+ * Force reload of FreeLLM config from database (discards cache).
+ */
+export async function reloadLLMConfig(): Promise<void> {
+  _dbConfig = null;
+  _dbConfigLoaded = false;
 }
 
 /**
@@ -365,7 +429,7 @@ export function getCircuitBreakerStatus() {
 /**
  * Check if FreeLLM is configured.
  */
-export function isFreeLLMConfigured(): boolean {
-  const config = getLLMConfig();
+export async function isFreeLLMConfigured(): Promise<boolean> {
+  const config = await getLLMConfig();
   return !!config.baseUrl && !!config.apiKey;
 }

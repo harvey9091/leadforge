@@ -18,7 +18,7 @@ import { logger } from "@/server/utils/logger";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 
-export type ExportFormat = "csv" | "json" | "xlsx";
+export type ExportFormat = "csv" | "json" | "xlsx" | "clipboard";
 
 export interface ExportConfig {
   format: ExportFormat;
@@ -215,6 +215,9 @@ export async function executeExport(
       fileContent = JSON.stringify(allData, null, 2);
       writeFileSync(filepath, fileContent);
       fileSize = Buffer.byteLength(fileContent);
+    } else if (config.format === "clipboard") {
+      fileContent = generateClipboard(allData, config.columns);
+      fileSize = Buffer.byteLength(fileContent);
     } else {
       // XLSX — generate as CSV with .xlsx extension note (real XLSX requires a library)
       // For now, generate XML-based XLSX-compatible format
@@ -317,6 +320,19 @@ export function escapeCSV(value: string): string {
     return `"${value.replace(/"/g, '""')}"`;
   }
   return value;
+}
+
+function generateClipboard(data: Record<string, unknown>[], columns: ExportColumn[]): string {
+  const rows: string[] = [];
+  rows.push(columns.map((c) => escapeTSV(c.label)).join("\t"));
+  for (const row of data) {
+    rows.push(columns.map((c) => escapeTSV(String(row[c.field] ?? ""))).join("\t"));
+  }
+  return rows.join("\n");
+}
+
+function escapeTSV(value: string): string {
+  return value.replace(/\t/g, "    ").replace(/\n/g, " ").trim();
 }
 
 function generateXLSX(data: Record<string, unknown>[], columns: ExportColumn[], includeHeaders: boolean): string {

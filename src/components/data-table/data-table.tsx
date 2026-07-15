@@ -16,9 +16,9 @@
  *  - Loading skeletons
  *  - Empty state
  *
- * The table is fully controlled — the parent owns data, pagination, and
- * sorting state. This makes it trivial to wire to any backend (Phase 2
- * Fastify API, Phase 3 GraphQL, etc.).
+ * Selection is ID-based and fully controlled by the parent. Selection state
+ * survives pagination because row IDs — not row indices — are used as keys.
+ * Shift+Click selects a range; Ctrl/Cmd+Click toggles individual rows.
  */
 
 import * as React from "react";
@@ -44,6 +44,7 @@ import {
   Search,
   SlidersHorizontal,
   Inbox,
+  Minus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -77,9 +78,12 @@ export interface DataTableProps<TData, TValue> {
   // Sorting (controlled)
   sorting?: SortingState;
   onSortingChange?: (state: SortingState) => void;
-  // Row selection
+  // Row selection (controlled, ID-based)
   enableSelection?: boolean;
+  selectedIds?: string[];
+  totalSelectedCount?: number;
   onSelectionChange?: (selectedIds: string[]) => void;
+  onSelectAllChange?: (allSelected: boolean) => void;
   // Row click
   onRowClick?: (row: TData) => void;
   // Toolbar actions (rendered on the right)
@@ -110,7 +114,10 @@ export function DataTable<TData extends { id?: string }, TValue = unknown>({
   sorting,
   onSortingChange,
   enableSelection = false,
+  selectedIds = [],
+  totalSelectedCount,
   onSelectionChange,
+  onSelectAllChange,
   onRowClick,
   toolbarActions,
   bulkActions,
@@ -119,17 +126,51 @@ export function DataTable<TData extends { id?: string }, TValue = unknown>({
   className,
   getRowId,
 }: DataTableProps<TData, TValue>) {
+  // Internal rowSelection state keyed by row IDs (not numeric indices).
+  // Derived from the controlled selectedIds prop so selection persists across
+  // page changes without relying on row position.
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
+
+  // Tracks the last row the user Shift+Clicked from, enabling range selection.
+  const lastSelectedRowIdRef = React.useRef<string | null>(null);
+
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
 
-  // Sync row selection outward
+  // Fast lookup: which IDs are present in the current page's data.
+  const dataIdSetRef = React.useRef<Set<string>>(new Set());
+  dataIdSetRef.current = new Set(
+    data.map((row) => (getRowId ? getRowId(row) : (row as { id?: string }).id ?? String(row)))
+  );
+
+  // Sync internal rowSelection when selectedIds changes from outside (e.g. page navigation).
+  const prevSelectedIdsRef = React.useRef<string[]>([]);
   React.useEffect(() => {
-    if (!onSelectionChange) return;
-    const ids = Object.keys(rowSelection)
-      .map((idx) => data[Number(idx)]?.id)
-      .filter(Boolean) as string[];
-    onSelectionChange(ids);
-  }, [rowSelection, data, onSelectionChange]);
+    const prev = prevSelectedIdsRef.current;
+    if (selectedIds.length !== prev.length || selectedIds.some((id, i) => id !== prev[i])) {
+      prevSelectedIdsRef.current = selectedIds;
+      const next: RowSelectionState = {};
+      for (const id of selectedIds) {
+        if (dataIdSetRef.current.has(id)) {
+          next[id] = true;
+        }
+      }
+      setRowSelection(next);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedIds]);
+
+  // Notify parent of current-page selection changes (always keyed by row ID).
+  const updateSelection = React.useCallback(
+    (updater: RowSelectionState | ((old: RowSelectionState) => RowSelectionState)) => {
+      setRowSelection((prev) => {
+        const next = typeof updater === "function" ? updater(prev) : updater;
+        const ids = Object.keys(next).filter((key) => dataIdSetRef.current.has(key));
+        if (onSelectionChange) onSelectionChange(ids);
+        return next;
+      });
+    },
+    [onSelectionChange]
+  );
 
   const table = useReactTable({
     data,
@@ -140,7 +181,7 @@ export function DataTable<TData extends { id?: string }, TValue = unknown>({
       rowSelection,
     },
     onColumnVisibilityChange: setColumnVisibility,
-    onRowSelectionChange: setRowSelection,
+    onRowSelectionChange: updateSelection,
     onSortingChange: onSortingChange
       ? (updater) => {
           const next = typeof updater === "function" ? updater(sorting ?? []) : updater;
@@ -151,19 +192,25 @@ export function DataTable<TData extends { id?: string }, TValue = unknown>({
     getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
-    manualPagination: true, // server-side
-    manualSorting: true, // server-side (when onSortingChange is provided)
+    manualPagination: true,
+    manualSorting: true,
     pageCount: Math.ceil(total / pageSize),
     getRowId: getRowId
       ? (row, idx) => getRowId(row)
       : (row, idx) => (row as { id?: string }).id ?? String(idx),
     enableRowSelection: enableSelection,
+    enableMultiRowSelection: true,
   });
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const to = Math.min(page * pageSize, total);
-  const selectedCount = Object.keys(rowSelection).length;
+
+  // Rows selected on the current visible page.
+  const currentPageSelectedCount = Object.keys(rowSelection).length;
+  // Total selected across all pages — use parent-supplied count when available
+  // so that selections from other pages are reflected in the UI.
+  const effectiveSelectedCount = totalSelectedCount ?? selectedIds?.length ?? currentPageSelectedCount;
 
   return (
     <div className={cn("flex flex-col space-y-3", className)}>
@@ -218,24 +265,30 @@ export function DataTable<TData extends { id?: string }, TValue = unknown>({
       </div>
 
       {/* Bulk action bar */}
-      {selectedCount > 0 && bulkActions && (
+      {effectiveSelectedCount > 0 && bulkActions && (
         <div className="flex items-center gap-3 px-3 h-11 rounded-md border border-border bg-card/60 backdrop-blur-sm">
           <span className="text-[12.5px] font-medium text-foreground">
-            {selectedCount} selected
+            {effectiveSelectedCount} selected
           </span>
+          {effectiveSelectedCount > currentPageSelectedCount && (
+            <span className="text-[10.5px] text-muted-foreground">
+              ({currentPageSelectedCount} on this page)
+            </span>
+          )}
           <div className="w-px h-4 bg-border" />
           <div className="flex items-center gap-1.5">
-            {bulkActions(
-              Object.keys(rowSelection)
-                .map((idx) => data[Number(idx)]?.id)
-                .filter(Boolean) as string[]
-            )}
+            {bulkActions(selectedIds)}
           </div>
           <Button
             variant="ghost"
             size="sm"
             className="ml-auto h-7 text-[11.5px] text-muted-foreground"
-            onClick={() => setRowSelection({})}
+            onClick={() => {
+              setRowSelection({});
+              if (onSelectionChange) onSelectionChange([]);
+              if (onSelectAllChange) onSelectAllChange(false);
+              lastSelectedRowIdRef.current = null;
+            }}
           >
             Clear
           </Button>
@@ -300,25 +353,80 @@ export function DataTable<TData extends { id?: string }, TValue = unknown>({
                   </td>
                 </tr>
               ) : (
-                table.getRowModel().rows.map((row) => (
-                  <tr
-                    key={row.id}
-                    data-state={row.getIsSelected() ? "selected" : undefined}
-                    className={cn(
-                      "border-b border-border/40 last:border-0 transition-colors group",
-                      "hover:bg-muted/30",
-                      row.getIsSelected() && "bg-info/[0.04]",
-                      onRowClick && "cursor-pointer"
-                    )}
-                    onClick={onRowClick ? () => onRowClick(row.original) : undefined}
-                  >
-                    {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className="px-3 py-2.5 align-middle">
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </td>
-                    ))}
-                  </tr>
-                ))
+                table.getRowModel().rows.map((row) => {
+                  const isSelected = row.getIsSelected();
+                  const rowId = row.id;
+
+                  const handleRowClick = (e: React.MouseEvent) => {
+                    if (!enableSelection) return;
+
+                    const hasModifier = e.shiftKey || e.metaKey || e.ctrlKey;
+
+                    // Stop checkbox in selection column from also handling this click.
+                    if (hasModifier) {
+                      e.stopPropagation();
+                    }
+
+                    // Shift+Click: select range from last anchor to current row.
+                    if (e.shiftKey && lastSelectedRowIdRef.current) {
+                      const allRows = table.getRowModel().rows;
+                      const currentIdx = allRows.findIndex((r) => r.id === rowId);
+                      const anchorIdx = allRows.findIndex((r) => r.id === lastSelectedRowIdRef.current);
+                      if (currentIdx >= 0 && anchorIdx >= 0 && currentIdx !== anchorIdx) {
+                        const [start, end] =
+                          currentIdx < anchorIdx ? [currentIdx, anchorIdx] : [anchorIdx, currentIdx];
+                        const rangeIds = allRows.slice(start, end + 1).map((r) => r.id);
+                        updateSelection((prev) => {
+                          const next = { ...prev };
+                          rangeIds.forEach((id) => { next[id] = true; });
+                          return next;
+                        });
+                        lastSelectedRowIdRef.current = rowId;
+                        return;
+                      }
+                    }
+
+                    // Ctrl/Cmd+Click: toggle this row, preserve other selections.
+                    if (e.metaKey || e.ctrlKey) {
+                      updateSelection((prev) => {
+                        const next = { ...prev };
+                        if (next[rowId]) {
+                          delete next[rowId];
+                        } else {
+                          next[rowId] = true;
+                        }
+                        return next;
+                      });
+                      lastSelectedRowIdRef.current = rowId;
+                      return;
+                    }
+
+                    // Plain click: select only this row, then navigate.
+                    lastSelectedRowIdRef.current = rowId;
+                    updateSelection({ [rowId]: true });
+                    if (onRowClick) onRowClick(row.original);
+                  };
+
+                  return (
+                    <tr
+                      key={row.id}
+                      data-state={isSelected ? "selected" : undefined}
+                      className={cn(
+                        "border-b border-border/40 last:border-0 transition-colors group",
+                        "hover:bg-muted/30",
+                        isSelected && "bg-info/[0.04]",
+                        onRowClick && enableSelection && "cursor-pointer"
+                      )}
+                      onClick={handleRowClick}
+                    >
+                      {row.getVisibleCells().map((cell) => (
+                        <td key={cell.id} className="px-3 py-2.5 align-middle">
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </td>
+                      ))}
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -420,22 +528,30 @@ export function selectionColumn<T extends { id?: string }>(): ColumnDef<T> {
     size: 32,
     header: ({ table }) => (
       <Checkbox
-        checked={table.getIsAllPageRowsSelected()}
-        indeterminate={table.getIsSomePageRowsSelected()}
-        onChange={table.getToggleAllPageRowsSelectedHandler()}
+        checked={table.getIsAllRowsSelected()}
+        indeterminate={table.getIsSomeRowsSelected() && !table.getIsAllRowsSelected()}
+        onChange={table.getToggleAllRowsSelectedHandler()}
         className="h-3.5 w-3.5"
         aria-label="Select all"
       />
     ),
-    cell: ({ row }) => (
-      <Checkbox
-        checked={row.getIsSelected()}
-        onChange={row.getToggleSelectedHandler()}
-        className="h-3.5 w-3.5"
-        aria-label="Select row"
-        onClick={(e) => e.stopPropagation()}
-      />
-    ),
+    cell: ({ row }) => {
+      const handleClick = (e: React.MouseEvent) => {
+        // Prevent row click handler from also firing on Ctrl/Cmd/Shift clicks.
+        if (e.shiftKey || e.metaKey || e.ctrlKey) {
+          e.stopPropagation();
+        }
+        row.getToggleSelectedHandler()(e);
+      };
+      return (
+        <Checkbox
+          checked={row.getIsSelected()}
+          onClick={handleClick}
+          className="h-3.5 w-3.5"
+          aria-label="Select row"
+        />
+      );
+    },
     enableSorting: false,
     enableHiding: false,
   };

@@ -169,14 +169,6 @@ const spec = {
         responses: { "200": { description: "Paginated list of people" } },
       },
     },
-    "/campaigns": {
-      get: {
-        summary: "List campaigns",
-        tags: ["Campaigns"],
-        security: [{ bearerAuth: [] }],
-        responses: { "200": { description: "Paginated list of campaigns" } },
-      },
-    },
     "/jobs": {
       get: {
         summary: "List jobs",
@@ -207,7 +199,6 @@ const spec = {
     { name: "Auth", description: "Authentication and session management" },
     { name: "Companies", description: "Company records" },
     { name: "People", description: "Contact records" },
-    { name: "Campaigns", description: "Outreach campaigns" },
     { name: "Jobs", description: "Background job queue mirror" },
     { name: "Stats", description: "Aggregated metrics" },
     { name: "Audit", description: "Compliance audit trail" },

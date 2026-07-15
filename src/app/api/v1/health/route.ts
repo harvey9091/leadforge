@@ -42,36 +42,46 @@ export async function GET(req: Request) {
     };
   }
 
+  // Queue sizes (pending jobs)
+  const [discoveryQueue, enrichmentQueue, aiQueue] = await Promise.all([
+    db.discoveryJob.count({ where: { status: { in: ["QUEUED", "RETRYING"] } } }),
+    db.enrichmentJob.count({ where: { status: { in: ["QUEUED", "RETRYING"] } } }),
+    db.aiAnalysis.count({ where: { status: { in: ["QUEUED", "RETRYING"] } } }),
+  ]);
+
   // Discovery worker
   const discoveryWorker = getWorkerStatus();
+  const discoveryActiveJob = discoveryWorker.activeJobs[0];
   services.discoveryWorker = {
     status: discoveryWorker.running ? "up" : "down",
     details: discoveryWorker.running
-      ? `${discoveryWorker.activeJobCount} active jobs`
+      ? `${discoveryWorker.activeJobCount} active jobs · ${discoveryQueue} queued`
       : "Worker not running",
   };
 
   // Enrichment worker
   const enrichmentWorker = getEnrichmentWorkerStatus();
+  const enrichmentActiveJob = enrichmentWorker.activeJobs[0];
   services.enrichmentWorker = {
     status: enrichmentWorker.running ? "up" : "down",
     details: enrichmentWorker.running
-      ? `${enrichmentWorker.activeJobCount} active jobs`
+      ? `${enrichmentWorker.activeJobCount} active jobs · ${enrichmentQueue} queued`
       : "Worker not running",
   };
 
   // AI worker
   const aiWorker = getAIWorkerStatus();
+  const aiActiveJob = aiWorker.activeJobs[0];
   services.aiWorker = {
     status: aiWorker.running ? "up" : "down",
     details: aiWorker.running
-      ? `${aiWorker.activeJobCount} active jobs`
+      ? `${aiWorker.activeJobCount} active jobs · ${aiQueue} queued`
       : "Worker not running",
   };
 
   // FreeLLM / AI circuit breaker
   const circuitBreaker = getCircuitBreakerStatus();
-  const llmConfig = getLLMConfig();
+  const llmConfig = await getLLMConfig();
   services.freellm = {
     status: llmConfig.baseUrl && llmConfig.apiKey ? (circuitBreaker.isOpen ? "degraded" : "up") : "down",
     details: !llmConfig.baseUrl
@@ -102,6 +112,8 @@ export async function GET(req: Request) {
   );
   const status = allUp ? "healthy" : "degraded";
 
+  const memoryUsage = process.memoryUsage();
+
   return apiSuccess(
     {
       status,
@@ -110,9 +122,39 @@ export async function GET(req: Request) {
       uptime: process.uptime(),
       services,
       workers: {
-        discovery: discoveryWorker,
-        enrichment: enrichmentWorker,
-        ai: aiWorker,
+        discovery: {
+          ...discoveryWorker,
+          queueSize: discoveryQueue,
+          currentJob: discoveryActiveJob ?? null,
+          lastHeartbeat: discoveryWorker.activeJobs.length > 0 ? new Date().toISOString() : null,
+          memory: {
+            rss: memoryUsage.rss,
+            heapUsed: memoryUsage.heapUsed,
+            heapTotal: memoryUsage.heapTotal,
+          },
+        },
+        enrichment: {
+          ...enrichmentWorker,
+          queueSize: enrichmentQueue,
+          currentJob: enrichmentActiveJob ?? null,
+          lastHeartbeat: enrichmentWorker.activeJobs.length > 0 ? new Date().toISOString() : null,
+          memory: {
+            rss: memoryUsage.rss,
+            heapUsed: memoryUsage.heapUsed,
+            heapTotal: memoryUsage.heapTotal,
+          },
+        },
+        ai: {
+          ...aiWorker,
+          queueSize: aiQueue,
+          currentJob: aiActiveJob ?? null,
+          lastHeartbeat: aiWorker.activeJobs.length > 0 ? new Date().toISOString() : null,
+          memory: {
+            rss: memoryUsage.rss,
+            heapUsed: memoryUsage.heapUsed,
+            heapTotal: memoryUsage.heapTotal,
+          },
+        },
       },
     },
     { requestId: ctx.requestId }

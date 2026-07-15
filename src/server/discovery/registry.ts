@@ -21,11 +21,11 @@ import { ycombinatorSource } from "./sources/ycombinator";
 import { betaListSource } from "./sources/betalist";
 import { devHuntSource } from "./sources/devhunt";
 import { uneedSource } from "./sources/uneed";
+import { githubTrendingSource } from "./sources/github-trending";
+import { peerlistSource } from "./sources/peerlist";
+import { indieHackersSource } from "./sources/indie-hackers";
+import { microLaunchSource } from "./sources/microlaunch";
 
-/**
- * All registered discovery sources.
- * Order matters — sources listed first are processed first.
- */
 export const DISCOVERY_SOURCES: DiscoverySource[] = [
   hackerNewsSource,
   productHuntSource,
@@ -33,6 +33,10 @@ export const DISCOVERY_SOURCES: DiscoverySource[] = [
   betaListSource,
   devHuntSource,
   uneedSource,
+  githubTrendingSource,
+  peerlistSource,
+  indieHackersSource,
+  microLaunchSource,
 ];
 
 /** Source metadata for the UI (no adapter logic). */
@@ -56,6 +60,10 @@ function getSourceDescription(id: SourceType): string {
     BETALIST: "Early-stage startup launches on BetaList",
     DEVHUNT: "Developer tool launches on DevHunt",
     UNEED: "SaaS tools directory on Uneed",
+    GITHUB_TRENDING: "Trending repositories on GitHub — discover new tools and projects",
+    PEERLIST: "Startup launches on Peerlist — founders sharing their products",
+    INDIE_HACKERS: "Indie Hackers launches — side projects and micro-startups",
+    MICROLAUNCH: "MicroLaunch — early-stage products and micro-startups",
     SEC_EDGAR: "SEC EDGAR filings (future)",
     GREENHOUSE: "Greenhouse job boards (future)",
     LEVER: "Lever job boards (future)",

@@ -264,24 +264,13 @@ async function processJob(jobId: string): Promise<void> {
         lastHeartbeat: new Date(),
       });
     },
-    sleep: (ms) => new Promise((resolve) => {
-      const handle = setTimeout(resolve, ms);
-      // Allow cancellation to interrupt sleep
-      const checkInterval = setInterval(() => {
-        if (!isJobActive(jobId)) {
-          clearTimeout(handle);
-          clearInterval(checkInterval);
-          resolve();
-        }
-      }, 500);
-      // Clear the interval when the timeout fires
-      const original = handle;
-      handle.unref?.();
-      const clearIntervalFn = () => clearInterval(checkInterval);
-      const originalTimeout = setTimeout(clearIntervalFn, ms + 100);
-      originalTimeout.unref?.();
-      void original;
-    }),
+    sleep: async (ms) => {
+      const end = Date.now() + ms;
+      while (Date.now() < end) {
+        if (!isJobActive(jobId)) return;
+        await new Promise((r) => setTimeout(r, Math.min(500, end - Date.now())));
+      }
+    },
   };
 
   let totalStored = 0;
@@ -437,11 +426,12 @@ async function processJob(jobId: string): Promise<void> {
             const rate = totalFound / (elapsed / 1000);
             const remaining = params.maxCompanies - totalFound;
             const eta = remaining > 0 && rate > 0 ? new Date(Date.now() + (remaining / rate) * 1000) : null;
-            await discoveryJobRepository.updateProgress(jobId, {
+            const progressUpdate: Record<string, unknown> = {
               ...progress,
               lastHeartbeat: new Date(),
-              estimatedCompletion: eta,
-            });
+            };
+            if (eta) progressUpdate.estimatedCompletion = eta;
+            await discoveryJobRepository.updateProgress(jobId, progressUpdate);
           }
 
           // Check max companies limit

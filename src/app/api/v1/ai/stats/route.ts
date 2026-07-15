@@ -14,11 +14,12 @@ export const runtime = "nodejs";
 export async function GET(req: Request) {
   const ctx = getRequestContext(req);
   try {
-    const [stats, latest, totalCompanies, enrichedCompanies] = await Promise.all([
+    const [stats, latest, totalCompanies, enrichedCompanies, llmConfig] = await Promise.all([
       aiAnalysisRepository.getStats(),
       aiAnalysisRepository.findLatest(8),
       db.company.count(),
       db.company.count({ where: { lastEnrichedAt: { not: null } } }),
+      getLLMConfig(),
     ]);
 
     const pendingJobs = await db.aIJob.count({ where: { status: { in: ["QUEUED", "RUNNING"] } } });
@@ -36,9 +37,9 @@ export async function GET(req: Request) {
       worker: getAIWorkerStatus(),
       circuitBreaker: getCircuitBreakerStatus(),
       llmConfig: {
-        model: getLLMConfig().model,
-        temperature: getLLMConfig().temperature,
-        maxTokens: getLLMConfig().maxTokens,
+        model: llmConfig.model,
+        temperature: llmConfig.temperature,
+        maxTokens: llmConfig.maxTokens,
       },
       latestAnalyses: latest.map((a) => ({
         companyId: a.companyId,

@@ -10,7 +10,7 @@ import { apiError, apiSuccess, getRequestContext, readJson, validate } from "@/s
 export const runtime = "nodejs";
 
 const exportSchema = z.object({
-  format: z.enum(["csv", "json", "xlsx"]),
+  format: z.enum(["csv", "json", "xlsx", "clipboard"]),
   columns: z.array(z.object({ field: z.string(), label: z.string() })).optional(),
   preset: z.string().optional(),
   filters: z.record(z.unknown()).optional(),

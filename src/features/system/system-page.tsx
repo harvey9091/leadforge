@@ -37,8 +37,36 @@ interface HealthResponse {
   uptime: number;
   services: Record<string, { status: string; latencyMs?: number; details?: string }>;
   workers: {
-    discovery: { workerId: string; running: boolean; activeJobCount: number; activeJobs: string[] };
-    enrichment: { workerId: string; running: boolean; activeJobCount: number; activeJobs: string[] };
+    discovery: {
+      workerId: string;
+      running: boolean;
+      activeJobCount: number;
+      activeJobs: string[];
+      queueSize: number;
+      currentJob: string | null;
+      lastHeartbeat: string | null;
+      memory: { rss: number; heapUsed: number; heapTotal: number };
+    };
+    enrichment: {
+      workerId: string;
+      running: boolean;
+      activeJobCount: number;
+      activeJobs: string[];
+      queueSize: number;
+      currentJob: string | null;
+      lastHeartbeat: string | null;
+      memory: { rss: number; heapUsed: number; heapTotal: number };
+    };
+    ai: {
+      workerId: string;
+      running: boolean;
+      activeJobCount: number;
+      activeJobs: string[];
+      queueSize: number;
+      currentJob: string | null;
+      lastHeartbeat: string | null;
+      memory: { rss: number; heapUsed: number; heapTotal: number };
+    };
   };
 }
 
@@ -120,7 +148,14 @@ export function SystemPage() {
                   tone={health.workers.discovery.running ? "success" : "danger"}
                 />
                 <WorkerStat label="Active Jobs" value={String(health.workers.discovery.activeJobCount)} />
-                <WorkerStat label="Poll Interval" value="5s" />
+                <WorkerStat label="Queue Size" value={String(health.workers.discovery.queueSize)} />
+                <WorkerStat label="Current Job" value={health.workers.discovery.currentJob ?? "—"} mono={!!health.workers.discovery.currentJob} />
+                <WorkerStat
+                  label="Last Heartbeat"
+                  value={health.workers.discovery.lastHeartbeat ? formatRelativeTime(health.workers.discovery.lastHeartbeat) : "—"}
+                />
+                <WorkerStat label="Memory (RSS)" value={formatBytes(health.workers.discovery.memory.rss)} />
+                <WorkerStat label="Heap Used" value={formatBytes(health.workers.discovery.memory.heapUsed)} />
               </div>
               {health.workers.discovery.activeJobs.length > 0 && (
                 <div className="mt-4 pt-4 border-t border-border/60">
@@ -149,7 +184,14 @@ export function SystemPage() {
                   tone={health.workers.enrichment.running ? "success" : "danger"}
                 />
                 <WorkerStat label="Active Jobs" value={String(health.workers.enrichment.activeJobCount)} />
-                <WorkerStat label="Poll Interval" value="5s" />
+                <WorkerStat label="Queue Size" value={String(health.workers.enrichment.queueSize)} />
+                <WorkerStat label="Current Job" value={health.workers.enrichment.currentJob ?? "—"} mono={!!health.workers.enrichment.currentJob} />
+                <WorkerStat
+                  label="Last Heartbeat"
+                  value={health.workers.enrichment.lastHeartbeat ? formatRelativeTime(health.workers.enrichment.lastHeartbeat) : "—"}
+                />
+                <WorkerStat label="Memory (RSS)" value={formatBytes(health.workers.enrichment.memory.rss)} />
+                <WorkerStat label="Heap Used" value={formatBytes(health.workers.enrichment.memory.heapUsed)} />
               </div>
               {health.workers.enrichment.activeJobs.length > 0 && (
                 <div className="mt-4 pt-4 border-t border-border/60">
@@ -232,4 +274,12 @@ function formatUptime(seconds: number): string {
   if (d > 0) return `${d}d ${h}h`;
   if (h > 0) return `${h}h ${m}m`;
   return `${m}m`;
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
 }

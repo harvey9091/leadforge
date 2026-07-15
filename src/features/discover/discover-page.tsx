@@ -36,6 +36,7 @@ import { StatCard } from "@/components/common/stat-card";
 import { Section } from "@/components/common/section";
 import { StatusBadge } from "@/components/common/status-badge";
 import { Card } from "@/components/ui/card";
+import { AnimatedList } from "@/components/animations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -210,7 +211,7 @@ export function DiscoverPage() {
             <CreateJobButton />
           </Card>
         ) : (
-          <div className="space-y-2">
+          <AnimatedList>
             {jobs.map((job) => (
               <JobCard
                 key={job.id}
@@ -219,7 +220,7 @@ export function DiscoverPage() {
                 onToggle={() => setExpandedJob(expandedJob === job.id ? null : job.id)}
               />
             ))}
-          </div>
+          </AnimatedList>
         )}
       </Section>
     </div>

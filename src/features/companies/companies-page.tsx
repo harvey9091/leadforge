@@ -311,7 +311,17 @@ export function CompaniesPage() {
           sorting={sorting}
           onSortingChange={setSorting}
           enableSelection
+          selectedIds={selected}
+          totalSelectedCount={selected.length}
           onSelectionChange={setSelected}
+          onSelectAllChange={(allSelected) => {
+            if (allSelected) {
+              const allCurrentIds = (data?.data ?? []).map((c) => c.id);
+              setSelected((prev) => Array.from(new Set([...prev, ...allCurrentIds])));
+            } else {
+              setSelected([]);
+            }
+          }}
           emptyTitle="No companies found"
           emptyDescription="No companies match your filters. Try adjusting your search or create a discovery job."
         />
@@ -456,7 +466,7 @@ function ExportDialog({ selectedIds, filters }: { selectedIds: string[]; filters
 
   const exportMutation = useMutation({
     mutationFn: async () => {
-      return apiClient.post("/workspace/exports", {
+      return apiClient.post<{ fileUrl?: string; totalRows?: number }>("/workspace/exports", {
         format,
         selectedIds: selectedIds.length > 0 ? selectedIds : undefined,
         filters: selectedIds.length > 0 ? undefined : filters,
@@ -477,7 +487,7 @@ function ExportDialog({ selectedIds, filters }: { selectedIds: string[]; filters
 
   const previewMutation = useMutation({
     mutationFn: async () => {
-      return apiClient.post("/workspace/exports", {
+      return apiClient.post<{ preview: { totalRows: number; estimatedSizeBytes: number; warnings: string[] } }>("/workspace/exports", {
         format,
         selectedIds: selectedIds.length > 0 ? selectedIds : undefined,
         filters: selectedIds.length > 0 ? undefined : filters,
@@ -562,7 +572,7 @@ function BulkActionsBar({ selectedIds, onClear }: { selectedIds: string[]; onCle
 
   const bulkMutation = useMutation({
     mutationFn: async (action: { action: string; data?: unknown }) => {
-      return apiClient.post("/workspace/bulk", { ...action, companyIds: selectedIds });
+      return apiClient.post<{ message?: string }>("/workspace/bulk", { ...action, companyIds: selectedIds });
     },
     onSuccess: (data: { message?: string }) => {
       toast({ title: "Bulk action complete", description: data.message });

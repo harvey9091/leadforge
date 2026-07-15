@@ -137,34 +137,6 @@ export interface Website {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Campaigns                                                                 */
-/* -------------------------------------------------------------------------- */
-
-export type CampaignStatus =
-  | "DRAFT"
-  | "SCHEDULED"
-  | "ACTIVE"
-  | "PAUSED"
-  | "COMPLETED"
-  | "ARCHIVED";
-
-export interface Campaign {
-  id: ID;
-  name: string;
-  description: string | null;
-  status: CampaignStatus;
-  audienceSize: number;
-  contactedCount: number;
-  responseCount: number;
-  meetingCount: number;
-  conversionRate: number;
-  startDate: ISODateString | null;
-  endDate: ISODateString | null;
-  createdAt: ISODateString;
-  updatedAt: ISODateString;
-}
-
-/* -------------------------------------------------------------------------- */
 /*  Scoring & Sources                                                         */
 /* -------------------------------------------------------------------------- */
 

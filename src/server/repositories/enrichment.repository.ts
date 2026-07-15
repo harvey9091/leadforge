@@ -80,6 +80,24 @@ export const enrichmentJobRepository = {
   async count() {
     return db.enrichmentJob.count();
   },
+
+  countUnenriched() {
+    return db.company.count({ where: { lastEnrichedAt: null } });
+  },
+
+  async createBulk(companyIds: string[], schedule: string = "manual") {
+    return db.$transaction(async (tx) => {
+      const jobs = await Promise.all(
+        companyIds.map((companyId) =>
+          tx.enrichmentJob.create({
+            data: { companyId, status: "QUEUED", schedule },
+            include: { company: { select: { id: true, name: true, domain: true } } },
+          })
+        )
+      );
+      return jobs;
+    });
+  },
 };
 
 // ---------------------------------------------------------------------------

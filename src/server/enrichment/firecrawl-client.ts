@@ -48,7 +48,9 @@ export interface FirecrawlConfig {
 
 let cachedConfig: FirecrawlConfig | null = null;
 let healthChecked = false;
+let healthCheckTimestamp = 0;
 let firecrawlAvailable = false;
+const HEALTH_CACHE_TTL_MS = 30_000;
 
 function getConfig(): FirecrawlConfig {
   if (cachedConfig) return cachedConfig;
@@ -83,7 +85,8 @@ export async function checkFirecrawlHealth(): Promise<{
     return { available: false, error: "FIRECRAWL_URL not configured" };
   }
 
-  if (healthChecked) {
+  const now = Date.now();
+  if (healthChecked && now - healthCheckTimestamp < HEALTH_CACHE_TTL_MS) {
     return { available: firecrawlAvailable };
   }
 
@@ -97,10 +100,22 @@ export async function checkFirecrawlHealth(): Promise<{
     const latencyMs = Math.round(performance.now() - start);
     firecrawlAvailable = result.ok;
     healthChecked = true;
+    healthCheckTimestamp = now;
+
+    let version: string | undefined;
+    if (result.ok) {
+      try {
+        const body = result.body as { version?: string; data?: { version?: string } };
+        version = body.version ?? body.data?.version ?? "unknown";
+      } catch {
+        version = "unknown";
+      }
+    }
+
     return {
       available: result.ok,
       latencyMs,
-      version: result.ok ? "unknown" : undefined,
+      version,
     };
   } catch (err) {
     firecrawlAvailable = false;

@@ -32,6 +32,10 @@ export interface FetchOptions {
   responseType?: "text" | "json" | "buffer";
   /** Accept these status codes without retry */
   allowStatuses?: number[];
+  /** HTTP method (default GET) */
+  method?: string;
+  /** Request body (for POST/PUT) */
+  body?: unknown;
 }
 
 export interface FetchResult {
@@ -113,7 +117,7 @@ export async function fetchWithRetry(
     const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-      const response = await fetch(url, {
+      const fetchOptions: RequestInit = {
         headers: {
           "User-Agent": randomUserAgent(),
           Accept: responseType === "json" ? "application/json" : "*/*",
@@ -121,7 +125,11 @@ export async function fetchWithRetry(
         },
         signal: controller.signal,
         redirect: "follow",
-      });
+      };
+      if (options.method) fetchOptions.method = options.method;
+      if (options.body !== undefined) fetchOptions.body = typeof options.body === "string" ? options.body : JSON.stringify(options.body);
+
+      const response = await fetch(url, fetchOptions);
 
       clearTimeout(timeoutHandle);
 

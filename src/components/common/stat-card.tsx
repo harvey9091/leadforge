@@ -16,6 +16,7 @@ import * as React from "react";
 import { ArrowDownRight, ArrowUpRight, ArrowRight } from "lucide-react";
 import { cn, formatNumber } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
+import { AnimatedCounter } from "@/components/animations/animated-counter";
 import {
   Tooltip,
   TooltipContent,
@@ -97,7 +98,11 @@ export function StatCard({
           <div className="h-7 w-20 rounded bg-muted/60 animate-pulse" />
         ) : (
           <span className="text-[26px] font-semibold tracking-tight text-foreground tabular-nums">
-            {formatted}
+            {typeof value === "string" ? (
+              value
+            ) : (
+              <AnimatedCounter value={value} format={format === "number" || format === "currency" ? "compact" : format} />
+            )}
           </span>
         )}
       </div>

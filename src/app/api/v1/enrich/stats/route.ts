@@ -50,6 +50,13 @@ export async function GET(req: Request) {
     // Firecrawl health
     const firecrawlHealth = await checkFirecrawlHealth();
 
+    // Last successful Firecrawl crawl — from most recent completed enrichment job
+    const lastSuccessfulCrawl = await db.enrichmentJob.findFirst({
+      where: { status: "COMPLETED" },
+      orderBy: { completedAt: "desc" },
+      select: { completedAt: true },
+    });
+
     // Technology distribution — find all company technologies and count
     const allCompanyTechs = await db.companyTechnology.findMany({
       take: 500,
@@ -106,6 +113,8 @@ export async function GET(req: Request) {
         configured: firecrawlHealth.available,
         available: firecrawlHealth.available,
         latencyMs: firecrawlHealth.latencyMs,
+        version: firecrawlHealth.version,
+        lastCrawl: lastSuccessfulCrawl?.completedAt ?? null,
         error: firecrawlHealth.error,
       },
       worker: getEnrichmentWorkerStatus(),

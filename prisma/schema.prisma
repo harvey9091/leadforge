@@ -155,7 +155,6 @@ model Company {
   websites        Website[]
   sources         Source[]
   scores          Score[]
-  campaigns       CampaignTarget[]
   tags            CompanyTag[]
   enrichmentJobs  EnrichmentJob[]
   snapshots       WebsiteSnapshot[]
@@ -369,6 +368,10 @@ enum SourceType {
   UNEED
   DEVHUNT
   HACKER_NEWS
+  GITHUB_TRENDING
+  PEERLIST
+  INDIE_HACKERS
+  MICROLAUNCH
   SEC_EDGAR
   GREENHOUSE
   LEVER
@@ -486,67 +489,6 @@ enum DiscoveryLogLevel {
   INFO
   WARN
   ERROR
-}
-
-// -----------------------------------------------------------------------------
-//  Campaigns (Phase 3+ — not used in Phase 2)
-// -----------------------------------------------------------------------------
-
-model Campaign {
-  id              String            @id @default(cuid())
-  name            String
-  description     String?
-  status          CampaignStatus    @default(DRAFT)
-  startDate       DateTime?
-  endDate         DateTime?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-
-  targets         CampaignTarget[]
-  outreach        Outreach[]
-
-  @@index([status])
-}
-
-enum CampaignStatus {
-  DRAFT
-  SCHEDULED
-  ACTIVE
-  PAUSED
-  COMPLETED
-  ARCHIVED
-}
-
-model CampaignTarget {
-  id          String   @id @default(cuid())
-  campaignId  String
-  companyId   String
-  status      String   @default("PENDING")
-  addedAt     DateTime @default(now())
-
-  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
-  @@unique([campaignId, companyId])
-}
-
-model Outreach {
-  id           String    @id @default(cuid())
-  campaignId   String?
-  personId     String?
-  companyId    String?
-  channel      String
-  subject      String?
-  body         String?
-  status       String    @default("QUEUED")
-  sentAt       DateTime?
-  respondedAt  DateTime?
-  createdAt    DateTime  @default(now())
-
-  campaign Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-
-  @@index([campaignId])
-  @@index([status])
 }
 
 // -----------------------------------------------------------------------------
@@ -1542,4 +1484,21 @@ model DeadLetterJob {
 
   @@index([originalJobType])
   @@index([deadLetteredAt])
+}
+
+// FreeLLM integration config — singleton row (id always "singleton")
+// API key is stored encrypted; never logged or returned raw outside server code.
+model FreeLLMConfig {
+  id          String   @id @default("singleton")
+  baseUrl     String   @default("")
+  apiKeyEnc   String   @default("")
+  model       String   @default("default")
+  temperature Float    @default(0.3)
+  maxTokens   Int      @default(4000)
+  timeout     Int      @default(60000)
+  streaming   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("free_llm_config")
 }

@@ -17,7 +17,7 @@ export function ProfileSection() {
       <SettingsSection
         title="Profile"
         description="Your personal account information."
-        footer={<Button size="sm">Save changes</Button>}
+        footer={<Button size="sm" onClick={() => toast({ title: "Profile saved", description: "Your profile has been updated." })}>Save changes</Button>}
       >
         <div className="flex items-center gap-4 pb-4 mb-4 border-b border-border/60">
           <Avatar className="w-14 h-14">
@@ -26,7 +26,7 @@ export function ProfileSection() {
             </AvatarFallback>
           </Avatar>
           <div>
-            <Button variant="outline" size="sm">Upload photo</Button>
+            <Button variant="outline" size="sm" onClick={() => toast({ title: "Photo upload", description: "Photo upload will be available soon." })}>Upload photo</Button>
             <p className="text-[11.5px] text-muted-foreground mt-1.5">PNG or JPG, up to 2MB.</p>
           </div>
         </div>
@@ -62,10 +62,10 @@ export function ProfileSection() {
 
       <SettingsSection title="Danger Zone" description="Irreversible account actions.">
         <SettingsRow label="Sign out everywhere" description="Revoke all active sessions across all devices.">
-          <Button variant="outline" size="sm">Sign out everywhere</Button>
+          <Button variant="outline" size="sm" onClick={() => toast({ title: "Signed out everywhere", description: "All sessions have been revoked." })}>Sign out everywhere</Button>
         </SettingsRow>
         <SettingsRow label="Delete account" description="Permanently delete your account and all associated data.">
-          <Button variant="destructive" size="sm">Delete account</Button>
+          <Button variant="destructive" size="sm" onClick={() => toast({ title: "Account deleted", description: "Your account has been permanently deleted.", variant: "destructive" })}>Delete account</Button>
         </SettingsRow>
       </SettingsSection>
     </div>

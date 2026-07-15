@@ -25,7 +25,6 @@ const G_MAP: Record<string, RouteId> = {
   l: "leads",
   c: "companies",
   p: "people",
-  m: "campaigns",
   a: "analytics",
   i: "ai-insights",
   s: "system",

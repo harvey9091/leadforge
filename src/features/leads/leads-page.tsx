@@ -37,6 +37,7 @@ import { apiClient } from "@/lib/api-client";
 import { formatRelativeTime, cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AddLeadDialog } from "@/features/leads/add-lead-dialog";
 
 interface Company {
   id: string;
@@ -246,10 +247,7 @@ export function LeadsPage() {
               <Download className="w-3.5 h-3.5" />
               Export
             </Button>
-            <Button size="sm" className="gap-1.5">
-              <Plus className="w-3.5 h-3.5" />
-              Add lead
-            </Button>
+            <AddLeadDialog />
           </>
         }
       />

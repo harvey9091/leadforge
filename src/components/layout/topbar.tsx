@@ -20,7 +20,6 @@ import { motion } from "framer-motion";
 import {
   Search,
   Bell,
-  Plus,
   Command as CommandIcon,
   ChevronRight,
 } from "lucide-react";
@@ -94,12 +93,6 @@ export function Topbar({ onToggleSidebar: _onToggleSidebar }: TopbarProps) {
         <Button variant="ghost" size="icon" className="w-8 h-8 relative" aria-label="Notifications">
           <Bell className="w-4 h-4" />
           <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-success" />
-        </Button>
-
-        {/* New */}
-        <Button size="sm" className="hidden sm:flex h-8 gap-1.5">
-          <Plus className="w-3.5 h-3.5" />
-          New
         </Button>
 
         {/* Divider */}

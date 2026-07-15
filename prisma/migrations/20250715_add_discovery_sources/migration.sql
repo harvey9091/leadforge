@@ -1,0 +1,5 @@
+-- Add new discovery source types
+ALTER TYPE "SourceType" ADD VALUE 'GITHUB_TRENDING';
+ALTER TYPE "SourceType" ADD VALUE 'PEERLIST';
+ALTER TYPE "SourceType" ADD VALUE 'INDIE_HACKERS';
+ALTER TYPE "SourceType" ADD VALUE 'MICROLAUNCH';

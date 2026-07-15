@@ -16,7 +16,7 @@
 
 import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronsLeft, ChevronsRight, Plus } from "lucide-react";
+import { ChevronsLeft, ChevronsRight } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { NAV_SECTIONS, type NavItem } from "@/components/layout/nav-config";
 import { routeHref, type RouteId } from "@/lib/routes";
@@ -69,25 +69,6 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               </div>
               <ChevronsRight className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
             </button>
-          )}
-        </div>
-
-        {/* New action */}
-        <div className="px-3 pt-3 pb-1 shrink-0">
-          {collapsed ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button size="icon" className="w-9 h-9" aria-label="New lead">
-                  <Plus className="w-4 h-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">New lead</TooltipContent>
-            </Tooltip>
-          ) : (
-            <Button className="w-full justify-start gap-2">
-              <Plus className="w-4 h-4" />
-              New lead
-            </Button>
           )}
         </div>
 

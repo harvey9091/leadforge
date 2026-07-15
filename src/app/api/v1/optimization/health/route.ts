@@ -18,13 +18,14 @@ export const runtime = "nodejs";
 
 export async function GET(req: Request) {
   const ctx = getRequestContext(req);
-  const [metrics, crawlStats, sourceMetrics, feedbackStats, promptStats, firecrawlHealth] = await Promise.all([
+  const [metrics, crawlStats, sourceMetrics, feedbackStats, promptStats, firecrawlHealth, llmConfig] = await Promise.all([
     getMetricsDashboard(),
     getCrawlStats(),
     getAllSourceMetrics(),
     getFeedbackStats(),
     getPromptStats(),
     checkFirecrawlHealth(),
+    getLLMConfig(),
   ]);
 
   return apiSuccess({
@@ -58,9 +59,9 @@ export async function GET(req: Request) {
     },
     circuitBreaker: getCircuitBreakerStatus(),
     llmConfig: {
-      model: getLLMConfig().model,
-      temperature: getLLMConfig().temperature,
-      maxTokens: getLLMConfig().maxTokens,
+      model: llmConfig.model,
+      temperature: llmConfig.temperature,
+      maxTokens: llmConfig.maxTokens,
     },
     firecrawl: {
       available: firecrawlHealth.available,

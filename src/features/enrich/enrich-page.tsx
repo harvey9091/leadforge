@@ -4,7 +4,7 @@
  * Enrich page — manage enrichment jobs and view enrichment metrics.
  *
  * Features:
- *  - Create enrichment job (pick a company to enrich)
+ *  - Bulk enrich all unenriched companies (single-click action)
  *  - View enrichment job list with live status
  *  - Pause / Resume / Retry / Cancel
  *  - Per-job log viewer
@@ -31,7 +31,7 @@ import {
   Terminal,
   Activity,
   Globe,
-  Search,
+  RefreshCw,
 } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { StatCard } from "@/components/common/stat-card";
@@ -39,7 +39,6 @@ import { Section } from "@/components/common/section";
 import { StatusBadge } from "@/components/common/status-badge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -80,7 +79,14 @@ interface EnrichStats {
   avgCrawlMs: number;
   avgPages: number;
   successRate: number;
-  firecrawl: { configured: boolean; available: boolean; latencyMs?: number; error?: string };
+  firecrawl: {
+    configured: boolean;
+    available: boolean;
+    latencyMs?: number;
+    version?: string;
+    lastCrawl?: string | null;
+    error?: string;
+  };
   worker: { workerId: string; running: boolean; activeJobCount: number };
   topTechnologies: Array<{ name: string; category: string; count: number }>;
   recentEnrichments: Array<{
@@ -98,11 +104,33 @@ interface Company {
 }
 
 export function EnrichPage() {
-  const { data: stats, isLoading: statsLoading } = useQuery({
+  const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useQuery({
     queryKey: ["enrich", "stats"],
     queryFn: () => apiClient.get<EnrichStats>("/enrich/stats"),
     refetchInterval: 5_000,
   });
+
+  const [testingFirecrawl, setTestingFirecrawl] = React.useState(false);
+  const [firecrawlTestResult, setFirecrawlTestResult] = React.useState<{ success: boolean; latencyMs?: number; version?: string; error?: string } | null>(null);
+
+  async function handleTestFirecrawl() {
+    setTestingFirecrawl(true);
+    setFirecrawlTestResult(null);
+    try {
+      const result = await apiClient.get<{ available: boolean; latencyMs?: number; version?: string; error?: string }>("/firecrawl/health");
+      setFirecrawlTestResult({
+        success: result.available,
+        latencyMs: result.latencyMs,
+        version: result.version,
+        error: result.error,
+      });
+      refetchStats();
+    } catch {
+      setFirecrawlTestResult({ success: false, error: "Failed to reach health endpoint" });
+    } finally {
+      setTestingFirecrawl(false);
+    }
+  }
 
   const { data: jobsData, isLoading: jobsLoading } = useQuery({
     queryKey: ["enrich", "jobs"],
@@ -114,7 +142,6 @@ export function EnrichPage() {
     },
   });
 
-  const [createOpen, setCreateOpen] = React.useState(false);
   const [expandedJob, setExpandedJob] = React.useState<string | null>(null);
 
   return (
@@ -122,37 +149,87 @@ export function EnrichPage() {
       <PageHeader
         title="Enrich"
         description="Enrich discovered companies with website data via Firecrawl."
-        actions={<CreateEnrichmentJobDialog open={createOpen} onOpenChange={setCreateOpen} />}
+        actions={<EnrichAllDialog />}
       />
 
       {/* Firecrawl status banner */}
       <Card className={cn(
-        "p-4 mb-6 border-border/60 flex items-center gap-4",
+        "p-4 mb-6 border-border/60",
         stats?.firecrawl.available ? "bg-success/[0.04]" : "bg-warning/[0.04]"
       )}>
-        <div className={cn(
-          "w-9 h-9 rounded-md flex items-center justify-center",
-          stats?.firecrawl.available ? "bg-success/10 text-success" : "bg-warning/10 text-warning"
-        )}>
-          <Globe className="w-4 h-4" />
-        </div>
-        <div className="flex-1">
-          <div className="text-[13px] font-medium text-foreground">
-            {statsLoading ? "Checking Firecrawl…" : stats?.firecrawl.available
-              ? "Firecrawl connected"
-              : "Firecrawl not configured — using direct HTTP fetch"}
+        <div className="flex items-start gap-4">
+          <div className={cn(
+            "w-9 h-9 rounded-md flex items-center justify-center shrink-0",
+            stats?.firecrawl.available ? "bg-success/10 text-success" : "bg-warning/10 text-warning"
+          )}>
+            <Globe className="w-4 h-4" />
           </div>
-          <div className="text-[11.5px] text-muted-foreground mt-0.5">
-            {stats?.firecrawl.available
-              ? `Latency: ${stats.firecrawl.latencyMs}ms — full scraping power`
-              : "All enrichment uses real website fetching. Configure FIRECRAWL_API_URL for enhanced scraping."}
+          <div className="flex-1 min-w-0 space-y-2">
+            <div className="text-[13px] font-medium text-foreground">
+              {statsLoading ? "Checking Firecrawl…" : stats?.firecrawl.available
+                ? "Firecrawl connected"
+                : stats?.firecrawl.configured
+                  ? "Firecrawl unavailable — using direct HTTP fetch"
+                  : "Firecrawl not configured — using direct HTTP fetch"}
+            </div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11.5px] text-muted-foreground">
+              {stats?.firecrawl.available && stats.firecrawl.latencyMs != null && (
+                <span>Latency: {stats.firecrawl.latencyMs}ms</span>
+              )}
+              {stats?.firecrawl.version && (
+                <span>Version: {stats.firecrawl.version}</span>
+              )}
+              {stats?.firecrawl.lastCrawl && (
+                <span>Last crawl: {formatRelativeTime(stats.firecrawl.lastCrawl)}</span>
+              )}
+              {stats?.firecrawl.error && !stats.firecrawl.available && (
+                <span className="text-warning">{stats.firecrawl.error}</span>
+              )}
+            </div>
+            {firecrawlTestResult && (
+              <div className={cn(
+                "rounded-md border p-2 flex items-center gap-2 text-[12px]",
+                firecrawlTestResult.success
+                  ? "border-success/30 bg-success/[0.04]"
+                  : "border-destructive/30 bg-destructive/[0.04]"
+              )}>
+                {firecrawlTestResult.success ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-success shrink-0" />
+                ) : (
+                  <XCircle className="w-3.5 h-3.5 text-destructive shrink-0" />
+                )}
+                <span className={firecrawlTestResult.success ? "text-success" : "text-destructive"}>
+                  {firecrawlTestResult.success ? "Connection OK" : "Connection failed"}
+                </span>
+                {firecrawlTestResult.latencyMs != null && (
+                  <span className="text-muted-foreground">· {firecrawlTestResult.latencyMs}ms</span>
+                )}
+                {firecrawlTestResult.version && (
+                  <span className="text-muted-foreground">· v{firecrawlTestResult.version}</span>
+                )}
+                {firecrawlTestResult.error && (
+                  <span className="text-destructive ml-auto">{firecrawlTestResult.error}</span>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-[11.5px] gap-1"
+              onClick={handleTestFirecrawl}
+              disabled={testingFirecrawl}
+            >
+              {testingFirecrawl ? <><Loader2 className="w-3 h-3 animate-spin" />Testing</> : <><RefreshCw className="w-3 h-3" />Test</>}
+            </Button>
+            {stats?.worker && (
+              <Badge variant="outline" className="text-[10px] font-normal">
+                {stats.worker.running ? "Worker running" : "Worker stopped"}
+              </Badge>
+            )}
           </div>
         </div>
-        {stats?.worker && (
-          <Badge variant="outline" className="text-[10px] font-normal">
-            {stats.worker.running ? "Worker running" : "Worker stopped"}
-          </Badge>
-        )}
       </Card>
 
       {/* Stats */}
@@ -239,7 +316,7 @@ export function EnrichPage() {
             <p className="text-[12.5px] text-muted-foreground mb-4 max-w-sm mx-auto">
               Enrich discovered companies to extract website data, detect technologies, and capture pricing information.
             </p>
-            <CreateEnrichmentJobDialog />
+             <EnrichAllDialog />
           </Card>
         ) : (
           <div className="space-y-2">
@@ -258,124 +335,75 @@ export function EnrichPage() {
   );
 }
 
-function CreateEnrichmentJobDialog({ open, onOpenChange }: { open?: boolean; onOpenChange?: (v: boolean) => void }) {
+function EnrichAllDialog() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [search, setSearch] = React.useState("");
-  const [selectedCompany, setSelectedCompany] = React.useState<Company | null>(null);
+  const [open, setOpen] = React.useState(false);
 
-  const { data: companies } = useQuery({
-    queryKey: ["companies", "for-enrich", search],
-    queryFn: () => apiClient.get<{ data: Company[]; pagination: { total: number } }>("/companies", {
-      pageSize: 20,
-      q: search || undefined,
-    }),
-    enabled: open !== false,
+  const { data: stats } = useQuery({
+    queryKey: ["enrich", "stats"],
+    queryFn: () => apiClient.get<{ companies: { pending: number } }>("/enrich/stats"),
   });
 
-  const createMutation = useMutation({
-    mutationFn: (companyId: string) =>
-      apiClient.post("/enrich/jobs", { companyId }),
-    onSuccess: () => {
-      toast({ title: "Enrichment job created", description: "Worker will start within 5 seconds." });
+  const bulkMutation = useMutation({
+    mutationFn: () => apiClient.post<{ enqueued: number; total: number; jobs: unknown[] }>("/enrich/bulk"),
+    onSuccess: (result) => {
+      toast({
+        title: `Enrichment enqueued`,
+        description: `${result.enqueued} companies enqueued for enrichment.`,
+      });
       queryClient.invalidateQueries({ queryKey: ["enrich"] });
-      onOpenChange?.(false);
-      setSelectedCompany(null);
-      setSearch("");
+      setOpen(false);
     },
     onError: (err) => {
       toast({
-        title: "Failed to create job",
+        title: "Failed to start enrichment",
         description: err instanceof Error ? err.message : "Unknown error",
         variant: "destructive",
       });
     },
   });
 
-  const dialog = (
-    <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
-      <DialogHeader>
-        <DialogTitle className="text-[16px]">Create enrichment job</DialogTitle>
-      </DialogHeader>
-      <div className="space-y-4 py-2">
-        <p className="text-[12.5px] text-muted-foreground">
-          Select a company to enrich. The worker will crawl its website, detect technologies, extract content, and capture pricing information.
-        </p>
-
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search companies…"
-            className="pl-8 h-9 text-[13px]"
-          />
-        </div>
-
-        <div className="max-h-64 overflow-y-auto space-y-1 rounded-md border border-border/60 p-1">
-          {companies?.data.length === 0 ? (
-            <div className="text-center py-6 text-[12px] text-muted-foreground">No companies found</div>
-          ) : (
-            companies?.data.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => setSelectedCompany(c)}
-                className={cn(
-                  "w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md text-left transition-colors",
-                  selectedCompany?.id === c.id ? "bg-foreground/8" : "hover:bg-muted/40"
-                )}
-              >
-                <div className="w-6 h-6 rounded bg-muted/60 flex items-center justify-center text-[9px] font-semibold shrink-0">
-                  {c.name.slice(0, 2).toUpperCase()}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-[12.5px] font-medium text-foreground truncate">{c.name}</div>
-                  <div className="text-[11px] text-muted-foreground truncate">{c.domain ?? "—"}</div>
-                </div>
-              </button>
-            ))
-          )}
-        </div>
-      </div>
-      <DialogFooter>
-        <Button
-          onClick={() => selectedCompany && createMutation.mutate(selectedCompany.id)}
-          disabled={!selectedCompany || createMutation.isPending}
-          className="gap-1.5"
-        >
-          {createMutation.isPending ? (
-            <><Loader2 className="w-3.5 h-3.5 animate-spin" />Creating…</>
-          ) : (
-            <><Zap className="w-3.5 h-3.5" />Start enrichment</>
-          )}
-        </Button>
-      </DialogFooter>
-    </DialogContent>
-  );
-
-  if (open !== undefined) {
-    return (
-      <Dialog open={open} onOpenChange={onOpenChange!}>
-        <DialogTrigger asChild>
-          <Button size="sm" className="gap-1.5">
-            <Zap className="w-3.5 h-3.5" />
-            Create job
-          </Button>
-        </DialogTrigger>
-        {dialog}
-      </Dialog>
-    );
-  }
+  const pendingCount = stats?.companies.pending ?? 0;
 
   return (
-    <Dialog>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" className="gap-1.5">
+        <Button size="sm" className="gap-1.5" disabled={pendingCount === 0}>
           <Zap className="w-3.5 h-3.5" />
-          Create job
+          Enrich all
         </Button>
       </DialogTrigger>
-      {dialog}
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="text-[15px]">Enrich all unenriched companies?</DialogTitle>
+        </DialogHeader>
+        <div className="py-3 space-y-2">
+          <p className="text-[12.5px] text-muted-foreground">
+            This will create enrichment jobs for every company that has not yet been enriched.
+            The worker processes jobs concurrently (up to 2 at a time).
+          </p>
+          <div className="flex items-center gap-2 rounded-md border border-border/60 p-3">
+            <Clock className="w-4 h-4 text-muted-foreground shrink-0" />
+            <span className="text-[13px] font-medium text-foreground">
+              {pendingCount} {pendingCount === 1 ? "company" : "companies"} pending enrichment
+            </span>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button
+            onClick={() => bulkMutation.mutate()}
+            disabled={bulkMutation.isPending || pendingCount === 0}
+            className="gap-1.5"
+          >
+            {bulkMutation.isPending ? (
+              <><Loader2 className="w-3.5 h-3.5 animate-spin" />Enqueuing…</>
+            ) : (
+              <><Zap className="w-3.5 h-3.5" />Start enrichment</>
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
     </Dialog>
   );
 }

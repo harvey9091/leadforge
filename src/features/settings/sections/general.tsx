@@ -5,14 +5,21 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { useToast } from "@/hooks/use-toast";
 
 export function GeneralSection() {
+  const { toast } = useToast();
+
+  const handleSave = () => {
+    toast({ title: "Settings saved", description: "Your workspace settings have been updated." });
+  };
+
   return (
     <div className="space-y-4">
       <SettingsSection
         title="Workspace"
         description="Basic information about your Leadforge workspace."
-        footer={<Button size="sm">Save changes</Button>}
+        footer={<Button size="sm" onClick={handleSave}>Save changes</Button>}
       >
         <SettingsRow label="Workspace name" description="Displayed in the sidebar and across the app.">
           <Input defaultValue="Leadforge" className="w-64 h-9 text-[13px]" />

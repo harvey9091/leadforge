@@ -329,6 +329,7 @@ export const companyRepository = {
     url?: string;
     rawPayload: unknown;
     discoveryJobId?: string;
+    confidence?: number;
   }) {
     // Check if this source already exists for this company
     const existing = await db.source.findFirst({
@@ -356,6 +357,7 @@ export const companyRepository = {
         url: source.url ?? null,
         rawPayload: JSON.stringify(source.rawPayload),
         discoveryJobId: source.discoveryJobId ?? null,
+        confidence: source.confidence ?? 50,
       },
     });
     return created.id;

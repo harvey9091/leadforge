@@ -35,7 +35,6 @@ import { LeadsPage } from "@/features/leads/leads-page";
 import { CompaniesPage } from "@/features/companies/companies-page";
 import { CompanyDetailPage } from "@/features/companies/company-detail-page";
 import { PeoplePage } from "@/features/people/people-page";
-import { CampaignsPage } from "@/features/campaigns/campaigns-page";
 import { AnalyticsPage } from "@/features/analytics/analytics-page";
 import { AiInsightsPage } from "@/features/ai-insights/ai-insights-page";
 import { FeedPage } from "@/features/feed/feed-page";
@@ -126,8 +125,6 @@ function renderView(id: string): React.ReactNode {
       return <CompaniesPage />; // compare is launched from companies
     case "people":
       return <PeoplePage />;
-    case "campaigns":
-      return <CampaignsPage />;
     case "analytics":
       return <AnalyticsPage />;
     case "ai-insights":

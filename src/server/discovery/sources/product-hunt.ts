@@ -16,6 +16,7 @@
 
 import type { DiscoverySource, DiscoveryParams, DiscoveryContext, RawCompany } from "../types";
 import { fetchWithRetry, RateLimiter } from "../http-client";
+import { parseAtomFeed, stripHtml } from "../utils/xml";
 
 const FEED_URL = "https://www.producthunt.com/feed";
 const SOURCE_TYPE = "PRODUCT_HUNT" as const;
@@ -123,52 +124,6 @@ export const productHuntSource: DiscoverySource = {
   },
 };
 
-/**
- * Parse an Atom XML feed into entries.
- * Uses a lightweight regex parser (no DOM dependency needed for this simple feed).
- */
-function parseAtomFeed(xml: string): AtomEntry[] {
-  const entries: AtomEntry[] = [];
-  const entryRegex = /<entry>([\s\S]*?)<\/entry>/gi;
-  let match: RegExpExecArray | null;
-
-  while ((match = entryRegex.exec(xml)) !== null) {
-    const block = match[1]!;
-    const entry: AtomEntry = {
-      id: extractTag(block, "id") ?? "",
-      title: extractTag(block, "title") ?? "",
-      link: extractAttr(block, "link", "href") ?? "",
-      published: extractTag(block, "published") ?? "",
-      updated: extractTag(block, "updated") ?? undefined,
-      content: extractTag(block, "content") ?? extractTag(block, "summary") ?? undefined,
-      author: extractTag(block, "name") ?? undefined,
-    };
-    if (entry.title && entry.link) {
-      entries.push(entry);
-    }
-  }
-
-  return entries;
-}
-
-function extractTag(xml: string, tag: string): string | undefined {
-  // Handle CDATA
-  const regex = new RegExp(`<${tag}[^>]*>(?:<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>|([\\s\\S]*?))<\\/${tag}>`, "i");
-  const match = regex.exec(xml);
-  if (!match) return undefined;
-  return (match[1] ?? match[2] ?? "").trim();
-}
-
-function extractAttr(xml: string, tag: string, attr: string): string | undefined {
-  const regex = new RegExp(`<${tag}[^>]*${attr}="([^"]*)"`, "i");
-  const match = regex.exec(xml);
-  return match?.[1];
-}
-
-/**
- * Extract the product's actual website URL from the Atom content.
- * Product Hunt embeds the product URL in the content HTML.
- */
 function extractProductWebsite(content: string): string | undefined {
   // Look for the product website link (not a producthunt.com link)
   const linkRegex = /href="(https?:\/\/[^"]+)"/gi;
@@ -182,15 +137,4 @@ function extractProductWebsite(content: string): string | undefined {
   return undefined;
 }
 
-function stripHtml(html: string): string {
-  return html
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#x27;/g, "'")
-    .replace(/&#39;/g, "'")
-    .replace(/\s+/g, " ")
-    .trim();
-}
+
