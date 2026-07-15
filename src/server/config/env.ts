@@ -1,4 +1,5 @@
 /**
+ * =============================================================================
  * Server-side environment configuration.
  *
  * Centralized, validated access to environment variables. Throws early on
@@ -6,6 +7,11 @@
  *
  * In production (Docker Compose), all of these are provided via the
  * `.env` file mounted into each container.
+ *
+ * For runtime-configurable services, use the Integration Manager instead
+ * (src/server/integrations/manager.ts). Environment variables serve only
+ * as fallbacks when the database is unavailable.
+ * =============================================================================
  */
 
 function required(name: string, fallback?: string): string {
@@ -38,7 +44,7 @@ export const env = {
   app: {
     name: "Leadforge",
     version: "8.0.0-production",
-    url: required("APP_URL", "http://localhost:3001"),
+    url: required("APP_URL", ""),
   },
 
   jwt: {
@@ -59,15 +65,15 @@ export const env = {
   },
 
   db: {
-    url: required("DATABASE_URL", "postgresql://leadforge:leadforge@localhost:5432/leadforge"),
+    url: required("DATABASE_URL", ""),
   },
 
   redis: {
-    url: required("REDIS_URL", "redis://localhost:6379"),
+    url: required("REDIS_URL", ""),
   },
 
   rabbitmq: {
-    url: required("RABBITMQ_URL", "amqp://localhost:5672"),
+    url: required("RABBITMQ_URL", ""),
   },
 
   freellm: {
@@ -108,3 +114,12 @@ export const env = {
 } as const;
 
 export type Env = typeof env;
+
+// Register all integrations on first import (server-side only)
+// This is safe because env.ts is one of the first modules imported server-side.
+try {
+  void import("@/server/integrations/bootstrap").then((m) => m.registerAllIntegrations()).catch(() => {});
+} catch {
+  // Integration Manager not available in this context
+}
+

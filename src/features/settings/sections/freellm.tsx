@@ -206,7 +206,7 @@ export function FreeLLMSection() {
             <Input
               value={baseUrl}
               onChange={(e) => setBaseUrl(e.target.value)}
-              placeholder="http://localhost:3002/v1"
+              placeholder="https://your-server:3002/v1"
               className="h-8 text-[13px]"
             />
           </div>

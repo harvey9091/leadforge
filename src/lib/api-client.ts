@@ -68,7 +68,7 @@ export async function api<T = unknown>(
 ): Promise<T> {
   const url = new URL(
     path.startsWith("http") ? path : `${API_ROOT}${path}`,
-    typeof window !== "undefined" ? window.location.origin : "http://localhost"
+    typeof window !== "undefined" ? window.location.origin : ""
   );
   if (opts.query) {
     for (const [k, v] of Object.entries(opts.query)) {

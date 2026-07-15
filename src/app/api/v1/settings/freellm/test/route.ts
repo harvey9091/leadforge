@@ -3,6 +3,7 @@
  * Test a FreeLLM connection with provided credentials (does NOT persist).
  */
 
+import { integrationManager } from "@/server/integrations/manager";
 import { apiError, apiSuccess, getRequestContext } from "@/server/utils/api";
 import { AppError } from "@/server/utils/errors";
 

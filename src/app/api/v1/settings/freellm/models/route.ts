@@ -38,23 +38,24 @@ export async function POST(req: Request) {
         success: false,
         latencyMs,
         error: `HTTP ${response.status}: ${errorText.slice(0, 200)}`,
-        models: [],
       }, { requestId: ctx.requestId });
     }
 
-    const data = await response.json() as { data?: Array<{ id: string }> };
-    const models = (data.data ?? []).map((m) => m.id).filter(Boolean);
+    const data = await response.json() as { data?: Array<{ id?: string }> };
+    const models = (data.data ?? [])
+      .map((m) => m.id)
+      .filter((id): id is string => !!id);
 
     return apiSuccess({
-      success: true,
-      latencyMs,
+      success: models.length > 0,
       models,
+      latencyMs,
+      error: models.length === 0 ? "No models returned from API" : undefined,
     }, { requestId: ctx.requestId });
   } catch (err) {
     return apiSuccess({
       success: false,
       error: err instanceof Error ? err.message : String(err),
-      models: [],
     }, { requestId: ctx.requestId });
   }
 }

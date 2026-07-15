@@ -1502,3 +1502,18 @@ model FreeLLMConfig {
 
   @@map("free_llm_config")
 }
+
+// Generic integration config — stores baseUrl and encrypted API key per service.
+// API key is stored encrypted; never logged or returned raw outside server code.
+model IntegrationConfig {
+  id          String   @id
+  baseUrl     String   @default("")
+  apiKeyEnc   String   @default("")
+  enabled     Boolean  @default(false)
+  timeout     Int      @default(30000)
+  maxRetries  Int      @default(2)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("integration_configs")
+}

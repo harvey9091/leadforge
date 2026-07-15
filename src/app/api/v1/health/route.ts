@@ -12,10 +12,10 @@ import { apiSuccess, getRequestContext } from "@/server/utils/api";
 import { ensureWorkerStarted } from "@/server/discovery/worker/bootstrap";
 import { getWorkerStatus } from "@/server/discovery/worker/worker";
 import { getEnrichmentWorkerStatus } from "@/server/enrichment/worker/worker";
-import { checkFirecrawlHealth } from "@/server/enrichment/firecrawl-client";
 import { ensureAIWorkerStarted } from "@/server/ai/worker/bootstrap";
 import { getAIWorkerStatus } from "@/server/ai/worker/worker";
 import { getCircuitBreakerStatus, getLLMConfig } from "@/server/ai/freellm-client";
+import { integrationManager } from "@/server/integrations/manager";
 
 export const runtime = "nodejs";
 
@@ -79,33 +79,31 @@ export async function GET(req: Request) {
       : "Worker not running",
   };
 
-  // FreeLLM / AI circuit breaker
+  // Integration Manager health checks
+  const integrationHealth = await integrationManager.checkAllHealth(true);
+  for (const [id, health] of integrationHealth) {
+    services[id] = {
+      status: health.status === "connected" ? "up" : health.status === "disconnected" ? "down" : "degraded",
+      latencyMs: health.latencyMs,
+      details: health.error || health.version || "OK",
+    };
+  }
+
+  // FreeLLM circuit breaker (keep backward compat)
   const circuitBreaker = getCircuitBreakerStatus();
   const llmConfig = await getLLMConfig();
-  services.freellm = {
-    status: llmConfig.baseUrl && llmConfig.apiKey ? (circuitBreaker.isOpen ? "degraded" : "up") : "down",
-    details: !llmConfig.baseUrl
-      ? "FREELLM_BASE_URL not configured"
-      : !llmConfig.apiKey
-      ? "FREELLM_API_KEY not configured"
-      : circuitBreaker.isOpen
-      ? `Circuit breaker open — resets in ${Math.ceil(circuitBreaker.resetIn / 1000)}s`
-      : `Connected to ${llmConfig.baseUrl}`,
-  };
-
-  // Firecrawl
-  const firecrawlHealth = await checkFirecrawlHealth();
-  services.firecrawl = {
-    status: firecrawlHealth.available ? "up" : "degraded",
-    latencyMs: firecrawlHealth.latencyMs,
-    details: firecrawlHealth.available
-      ? "Connected — using Firecrawl for crawling"
-      : "Not configured — using direct HTTP fetch fallback",
-  };
-
-  // Redis / RabbitMQ — still Phase 3+
-  services.redis = { status: "pending", details: "Not wired" };
-  services.rabbitmq = { status: "pending", details: "Not wired" };
+  if (!services.freellm) {
+    services.freellm = {
+      status: llmConfig.baseUrl && llmConfig.apiKey ? (circuitBreaker.isOpen ? "degraded" : "up") : "down",
+      details: !llmConfig.baseUrl
+        ? "FREELLM_BASE_URL not configured"
+        : !llmConfig.apiKey
+        ? "FREELLM_API_KEY not configured"
+        : circuitBreaker.isOpen
+        ? `Circuit breaker open — resets in ${Math.ceil(circuitBreaker.resetIn / 1000)}s`
+        : `Connected to ${llmConfig.baseUrl}`,
+    };
+  }
 
   const allUp = Object.values(services).every(
     (s) => s.status === "up" || s.status === "pending" || s.status === "degraded"

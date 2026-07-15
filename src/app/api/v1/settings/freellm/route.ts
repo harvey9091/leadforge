@@ -11,6 +11,7 @@ import {
   encryptApiKey,
   decryptApiKey,
 } from "@/server/ai/freellm-settings";
+import { integrationManager } from "@/server/integrations/manager";
 import { apiError, apiSuccess, getRequestContext } from "@/server/utils/api";
 import { AppError } from "@/server/utils/errors";
 
@@ -18,8 +19,25 @@ export const runtime = "nodejs";
 
 export async function GET() {
   try {
-    const cfg = await loadFreeLLMConfig();
+    const integration = integrationManager.get("freellm");
+    if (integration) {
+      const config = await integration.loadConfiguration();
+      if (config) {
+        return apiSuccess({
+          configured: !!(config.baseUrl && config.apiKey),
+          baseUrl: config.baseUrl,
+          model: config.baseUrl ? "default" : "default",
+          temperature: 0.3,
+          maxTokens: 4000,
+          timeout: config.timeout,
+          streaming: false,
+          apiKeySet: !!config.apiKey,
+          updatedAt: config.updatedAt,
+        });
+      }
+    }
 
+    const cfg = await loadFreeLLMConfig();
     const row = await db.freeLLMConfig.findUnique({ where: { id: "singleton" } });
 
     return apiSuccess({
@@ -55,28 +73,46 @@ export async function POST(req: Request) {
       throw new AppError({ code: "VALIDATION_ERROR", message: "Base URL is required", status: 400 });
     }
 
-    const newEncryptedKey = apiKey ? encryptApiKey(apiKey) : "";
+    const integration = integrationManager.get("freellm");
+    if (integration) {
+      const existing = await integration.loadConfiguration();
+      const finalKey = apiKey || existing?.apiKey || "";
 
-    const existing = await db.freeLLMConfig.findUnique({ where: { id: "singleton" } });
+      await integrationManager.saveConfiguration("freellm", {
+        id: "freellm",
+        name: "FreeLLM",
+        description: "LLM gateway for AI qualification",
+        icon: "sparkles",
+        baseUrl,
+        apiKey: finalKey,
+        enabled: true,
+        timeout,
+        maxRetries: 3,
+        updatedAt: new Date().toISOString(),
+      });
+    } else {
+      const newEncryptedKey = apiKey ? encryptApiKey(apiKey) : "";
+      const existing = await db.freeLLMConfig.findUnique({ where: { id: "singleton" } });
 
-    if (!baseUrl && !apiKey && existing) {
-      await clearFreeLLMConfig();
-      return apiSuccess({ ok: true, message: "FreeLLM config cleared" }, { requestId: ctx.requestId });
+      if (!baseUrl && !apiKey && existing) {
+        await clearFreeLLMConfig();
+        return apiSuccess({ ok: true, message: "FreeLLM config cleared" }, { requestId: ctx.requestId });
+      }
+
+      const finalKey = apiKey
+        ? newEncryptedKey
+        : existing?.apiKeyEnc ?? "";
+
+      await saveFreeLLMConfig({
+        baseUrl,
+        apiKey: apiKey || (existing ? decryptApiKey(existing.apiKeyEnc) : ""),
+        model,
+        temperature,
+        maxTokens,
+        timeout,
+        streaming,
+      });
     }
-
-    const finalKey = apiKey
-      ? newEncryptedKey
-      : existing?.apiKeyEnc ?? "";
-
-    await saveFreeLLMConfig({
-      baseUrl,
-      apiKey: apiKey || (existing ? decryptApiKey(existing.apiKeyEnc) : ""),
-      model,
-      temperature,
-      maxTokens,
-      timeout,
-      streaming,
-    });
 
     return apiSuccess(
       { ok: true, message: "FreeLLM configuration saved" },

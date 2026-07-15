@@ -33,6 +33,7 @@ export type RouteId =
   | "settings.appearance"
   | "settings.api-keys"
   | "settings.integrations"
+  | "settings.infrastructure"
   | "settings.freellm"
   | "settings.workers"
   | "settings.system"
@@ -224,6 +225,14 @@ export const ROUTES: Record<RouteId, RouteMeta> = {
     path: "/settings/integrations",
     title: "Integrations — Leadforge",
     description: "Connect external services.",
+    protected: true,
+    shell: true,
+  },
+  "settings.infrastructure": {
+    id: "settings.infrastructure",
+    path: "/settings/infrastructure",
+    title: "Infrastructure — Leadforge",
+    description: "Manage external service connections and health.",
     protected: true,
     shell: true,
   },

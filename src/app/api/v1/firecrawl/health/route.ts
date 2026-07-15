@@ -3,22 +3,21 @@
  * Check Firecrawl instance health.
  */
 
-import { checkFirecrawlHealth, isFirecrawlConfigured } from "@/server/enrichment/firecrawl-client";
+import { integrationManager } from "@/server/integrations/manager";
 import { apiSuccess, getRequestContext } from "@/server/utils/api";
 
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
   const ctx = getRequestContext(req);
-  const configured = isFirecrawlConfigured();
-  const health = await checkFirecrawlHealth();
+  const health = await integrationManager.checkHealth("firecrawl", true);
 
   return apiSuccess({
-    configured,
-    available: health.available,
+    configured: health.status !== "disconnected" && health.status !== "error",
+    available: health.status === "connected",
     latencyMs: health.latencyMs,
     version: health.version,
     error: health.error,
-    mode: health.available ? "firecrawl" : "direct",
+    mode: health.status === "connected" ? "firecrawl" : "direct",
   }, { requestId: ctx.requestId });
 }

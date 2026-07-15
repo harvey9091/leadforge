@@ -8,8 +8,9 @@
  * env var (must be 32 bytes / 64 hex chars).
  *
  * Config loading precedence:
- *  1. Database (user-configured via Settings > FreeLLM)
- *  2. Environment variables (fallback)
+ *  1. Integration Manager (integration_configs table) — primary
+ *  2. Legacy FreeLLMConfig table — fallback for backward compatibility
+ *  3. Environment variables — last resort fallback
  * =============================================================================
  */
 
@@ -17,6 +18,7 @@ import { logger } from "@/server/utils/logger";
 import { db } from "@/lib/db";
 import { FreeLLMConfig } from "@prisma/client";
 import { randomBytes, createCipheriv, createDecipheriv } from "node:crypto";
+import { integrationManager } from "@/server/integrations/manager";
 
 let _cachedConfig: { baseUrl: string; apiKey: string; model: string; temperature: number; maxTokens: number; timeout: number; streaming: boolean } | null = null;
 let _cacheTimestamp = 0;
@@ -57,6 +59,62 @@ export function decryptApiKey(encrypted: string): string {
   }
 }
 
+async function loadFromIntegrationManager(): Promise<{
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  temperature: number;
+  maxTokens: number;
+  timeout: number;
+  streaming: boolean;
+} | null> {
+  try {
+    const integration = integrationManager.get("freellm");
+    if (!integration) return null;
+    const config = await integration.loadConfiguration();
+    if (!config || (!config.baseUrl && !config.apiKey)) return null;
+    return {
+      baseUrl: config.baseUrl,
+      apiKey: config.apiKey,
+      model: "default",
+      temperature: 0.3,
+      maxTokens: 4000,
+      timeout: config.timeout,
+      streaming: false,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function loadFromLegacyTable(): Promise<{
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  temperature: number;
+  maxTokens: number;
+  timeout: number;
+  streaming: boolean;
+} | null> {
+  try {
+    const row = await db.freeLLMConfig.findUnique({ where: { id: "singleton" } });
+    if (row && (row.baseUrl || row.apiKeyEnc)) {
+      return {
+        baseUrl: row.baseUrl,
+        apiKey: decryptApiKey(row.apiKeyEnc),
+        model: row.model,
+        temperature: row.temperature,
+        maxTokens: row.maxTokens,
+        timeout: row.timeout,
+        streaming: row.streaming,
+      };
+    }
+  } catch {
+    // table may not exist yet during first migration
+  }
+  return null;
+}
+
 export async function loadFreeLLMConfig(): Promise<{
   baseUrl: string;
   apiKey: string;
@@ -71,23 +129,19 @@ export async function loadFreeLLMConfig(): Promise<{
     return _cachedConfig;
   }
 
-  try {
-    const row = await db.freeLLMConfig.findUnique({ where: { id: "singleton" } });
-    if (row) {
-      _cachedConfig = {
-        baseUrl: row.baseUrl,
-        apiKey: decryptApiKey(row.apiKeyEnc),
-        model: row.model,
-        temperature: row.temperature,
-        maxTokens: row.maxTokens,
-        timeout: row.timeout,
-        streaming: row.streaming,
-      };
-      _cacheTimestamp = now;
-      return _cachedConfig;
-    }
-  } catch {
-    // table may not exist yet during first migration
+  // Priority: Integration Manager > legacy table > env vars
+  const fromManager = await loadFromIntegrationManager();
+  if (fromManager) {
+    _cachedConfig = fromManager;
+    _cacheTimestamp = now;
+    return _cachedConfig;
+  }
+
+  const fromLegacy = await loadFromLegacyTable();
+  if (fromLegacy) {
+    _cachedConfig = fromLegacy;
+    _cacheTimestamp = now;
+    return _cachedConfig;
   }
 
   _cachedConfig = {

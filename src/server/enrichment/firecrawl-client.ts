@@ -4,18 +4,20 @@
  * =============================================================================
  *
  * Dual-mode enrichment:
- *  1. If FIRECRAWL_API_URL is set and reachable → use Firecrawl for scraping
+ *  1. If Firecrawl is configured and reachable → use Firecrawl for scraping
  *  2. Otherwise → fall back to direct HTTP fetch + HTML parsing
  *
  * Both modes produce the same `CrawledPage` shape so downstream code
  * doesn't care which mode was used.
  *
- * No mock data — every page is fetched from the real internet.
+ * Configuration is loaded via the Integration Manager — never from
+ * process.env directly.
  * =============================================================================
  */
 
 import { fetchWithRetry, RateLimiter } from "@/server/discovery/http-client";
 import { logger } from "@/server/utils/logger";
+import { integrationManager } from "@/server/integrations/manager";
 
 const rateLimiter = new RateLimiter(2); // 2 req/sec
 
@@ -39,27 +41,32 @@ export interface CrawledPage {
   error?: string;
 }
 
-export interface FirecrawlConfig {
-  apiUrl: string;
-  apiKey?: string;
-  timeout: number;
-  maxRetries: number;
-}
-
-let cachedConfig: FirecrawlConfig | null = null;
+let cachedConfig: { apiUrl: string; apiKey: string; timeout: number; maxRetries: number } | null = null;
 let healthChecked = false;
 let healthCheckTimestamp = 0;
 let firecrawlAvailable = false;
 const HEALTH_CACHE_TTL_MS = 30_000;
 
-function getConfig(): FirecrawlConfig {
+async function getConfig(): Promise<{ apiUrl: string; apiKey: string; timeout: number; maxRetries: number }> {
   if (cachedConfig) return cachedConfig;
+
+  const integration = integrationManager.get("firecrawl");
+  if (!integration) {
+    cachedConfig = {
+      apiUrl: "",
+      apiKey: "",
+      timeout: 30000,
+      maxRetries: 2,
+    };
+    return cachedConfig;
+  }
+
+  const config = await integration.loadConfiguration();
   cachedConfig = {
-    // Support both FIRECRAWL_URL (production) and FIRECRAWL_API_URL (legacy)
-    apiUrl: process.env.FIRECRAWL_URL ?? process.env.FIRECRAWL_API_URL ?? "",
-    apiKey: process.env.FIRECRAWL_API_KEY ?? "",
-    timeout: parseInt(process.env.FIRECRAWL_TIMEOUT ?? "30000", 10),
-    maxRetries: parseInt(process.env.FIRECRAWL_MAX_RETRIES ?? "2", 10),
+    apiUrl: config?.baseUrl ?? "",
+    apiKey: config?.apiKey ?? "",
+    timeout: config?.timeout ?? 30000,
+    maxRetries: config?.maxRetries ?? 2,
   };
   return cachedConfig;
 }
@@ -68,7 +75,7 @@ function getConfig(): FirecrawlConfig {
  * Check if Firecrawl is available (cached after first check).
  */
 export function isFirecrawlConfigured(): boolean {
-  return !!getConfig().apiUrl;
+  return !!cachedConfig?.apiUrl;
 }
 
 /**
@@ -80,9 +87,9 @@ export async function checkFirecrawlHealth(): Promise<{
   version?: string;
   error?: string;
 }> {
-  const config = getConfig();
+  const config = await getConfig();
   if (!config.apiUrl) {
-    return { available: false, error: "FIRECRAWL_URL not configured" };
+    return { available: false, error: "Firecrawl URL not configured" };
   }
 
   const now = Date.now();
@@ -133,7 +140,7 @@ export async function checkFirecrawlHealth(): Promise<{
 export async function crawlPage(url: string): Promise<CrawledPage> {
   await rateLimiter.wait();
 
-  const config = getConfig();
+  const config = await getConfig();
   if (config.apiUrl && firecrawlAvailable) {
     try {
       return await crawlWithFirecrawl(url, config);
@@ -151,7 +158,7 @@ export async function crawlPage(url: string): Promise<CrawledPage> {
 /**
  * Crawl using Firecrawl's /v1/scrape endpoint.
  */
-async function crawlWithFirecrawl(url: string, config: FirecrawlConfig): Promise<CrawledPage> {
+async function crawlWithFirecrawl(url: string, config: { apiUrl: string; apiKey: string; timeout: number; maxRetries: number }): Promise<CrawledPage> {
   const start = performance.now();
   const result = await fetchWithRetry(`${config.apiUrl}/v1/scrape`, {
     method: "POST",
@@ -246,7 +253,6 @@ async function crawlDirect(url: string): Promise<CrawledPage> {
   }
 
   const html = (result.body as string) ?? "";
-  // Cap HTML at 500KB to prevent memory issues
   const cappedHtml = html.length > 500_000 ? html.slice(0, 500_000) : html;
   const { title, description } = extractMeta(cappedHtml);
 
@@ -303,7 +309,6 @@ function extractMeta(html: string): { title?: string; description?: string } {
 }
 
 function hashContent(content: string): string {
-  // Simple hash for change detection
   let hash = 0;
   for (let i = 0; i < content.length; i++) {
     const char = content.charCodeAt(i);

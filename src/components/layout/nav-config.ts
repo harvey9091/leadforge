@@ -16,6 +16,7 @@ import {
   Activity,
   Settings,
   KeyRound,
+  Server,
   type LucideIcon,
 } from "lucide-react";
 import type { RouteId } from "@/lib/routes";
@@ -133,6 +134,7 @@ export const SETTINGS_SUBNAV: NavItem[] = [
   { id: "settings.profile", label: "Profile", icon: Contact2 },
   { id: "settings.appearance", label: "Appearance", icon: BarChart3 },
   { id: "settings.api-keys", label: "API Keys", icon: KeyRound },
+  { id: "settings.infrastructure", label: "Infrastructure", icon: Server },
   { id: "settings.integrations", label: "Integrations", icon: Sparkles, soon: true },
   { id: "settings.freellm", label: "FreeLLM", icon: Sparkles },
   { id: "settings.workers", label: "Workers", icon: Activity, soon: true },

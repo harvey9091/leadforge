@@ -19,6 +19,7 @@ import { ProfileSection } from "@/features/settings/sections/profile";
 import { AppearanceSection } from "@/features/settings/sections/appearance";
 import { ApiKeysSection } from "@/features/settings/sections/api-keys";
 import { IntegrationsSection } from "@/features/settings/sections/integrations";
+import { InfrastructureSection } from "@/features/settings/sections/infrastructure";
 import { WorkersSection } from "@/features/settings/sections/workers";
 import { SystemSection } from "@/features/settings/sections/system";
 import { FreeLLMSection } from "@/features/settings/sections/freellm";
@@ -70,6 +71,7 @@ export function SettingsPage() {
           {activeId === "settings.appearance" && <AppearanceSection />}
           {activeId === "settings.api-keys" && <ApiKeysSection />}
           {activeId === "settings.integrations" && <IntegrationsSection />}
+          {activeId === "settings.infrastructure" && <InfrastructureSection />}
           {activeId === "settings.freellm" && <FreeLLMSection />}
           {activeId === "settings.workers" && <WorkersSection />}
           {activeId === "settings.system" && <SystemSection />}

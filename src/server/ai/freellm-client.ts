@@ -6,12 +6,9 @@
  * Connects to the external FreeLLM API (OpenAI-compatible) running on
  * Server 2 (automation-server-2). Never installs AI services locally.
  *
- * Configuration (from environment or database):
- *   FREELLM_BASE_URL  — e.g. http://your-server-2:3002/v1
- *   FREELLM_API_KEY   — API key (never hardcoded)
- *
- * Database config (set via Settings > FreeLLM) takes precedence over
- * environment variables.
+ * Configuration (from Integration Manager or database, set via Settings > Infrastructure):
+ *   - Base URL — e.g. https://your-server-2:3002/v1
+ *   - API key — stored encrypted in database
  *
  * Features:
  *  - Retry with exponential backoff
@@ -150,10 +147,10 @@ export async function callFreeLLM(
   const fullConfig = { ...await getLLMConfig(), ...config };
 
   if (!fullConfig.baseUrl) {
-    throw new Error("FREELLM_BASE_URL not configured — cannot call FreeLLM");
+    throw new Error("FreeLLM not configured — set base URL in Settings > Infrastructure");
   }
   if (!fullConfig.apiKey) {
-    throw new Error("FREELLM_API_KEY not configured — cannot call FreeLLM");
+    throw new Error("FreeLLM API key not configured — set in Settings > Infrastructure");
   }
 
   if (isCircuitOpen()) {
@@ -284,7 +281,7 @@ export async function* streamFreeLLM(
 ): AsyncGenerator<string, void, void> {
   const fullConfig = { ...await getLLMConfig(), ...config };
   if (!fullConfig.baseUrl || !fullConfig.apiKey) {
-    throw new Error("FreeLLM not configured");
+    throw new Error("FreeLLM not configured — set in Settings > Infrastructure");
   }
 
   const response = await fetch(`${fullConfig.baseUrl}/chat/completions`, {
