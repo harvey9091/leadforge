@@ -1,23 +1,43 @@
 "use client";
 
 /**
- * EmptyState — friendly placeholder for empty data states.
+ * EmptyState — intentional empty page state with helpful illustration.
  *
- * Designed to be visually quiet — no big illustrations, just a clean
- * icon + message + optional CTA. The user should never feel like the
- * app is broken when there's no data.
+ * Premium redesign:
+ *  - Better visual hierarchy
+ *  - More refined illustration area
+ *  - Clearer actions
+ *  - Better spacing
  */
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { Card } from "@/components/ui/card";
+import { type VariantProps, cva } from "class-variance-authority";
+
+const emptyVariants = cva(
+  "flex flex-col items-center justify-center text-center py-16 px-6",
+  {
+    variants: {
+      size: {
+        default: "py-16",
+        sm: "py-10",
+        lg: "py-24",
+      },
+    },
+    defaultVariants: {
+      size: "default",
+    },
+  }
+);
 
 interface EmptyStateProps {
   icon?: React.ComponentType<{ className?: string }>;
   title: string;
   description?: string;
   action?: React.ReactNode;
+  secondaryAction?: React.ReactNode;
   className?: string;
+  size?: "default" | "sm" | "lg";
 }
 
 export function EmptyState({
@@ -25,27 +45,31 @@ export function EmptyState({
   title,
   description,
   action,
+  secondaryAction,
   className,
+  size = "default",
 }: EmptyStateProps) {
   return (
-    <Card
-      className={cn(
-        "flex flex-col items-center justify-center text-center p-10 border-dashed border-border/60 bg-card/20",
-        className
-      )}
-    >
+    <div className={cn(emptyVariants({ size }), className)}>
       {Icon && (
-        <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-muted/40 text-muted-foreground mb-3">
-          <Icon className="w-4.5 h-4.5" />
+        <div className="w-14 h-14 rounded-2xl bg-muted/40 flex items-center justify-center mb-5 text-muted-foreground/60">
+          <Icon className="w-7 h-7" />
         </div>
       )}
-      <h3 className="text-[14px] font-semibold text-foreground">{title}</h3>
+      <h3 className="text-[15px] font-semibold text-foreground mb-2">
+        {title}
+      </h3>
       {description && (
-        <p className="mt-1 text-[12.5px] text-muted-foreground max-w-sm leading-relaxed">
+        <p className="text-[13.5px] text-muted-foreground leading-relaxed max-w-sm mb-6">
           {description}
         </p>
       )}
-      {action && <div className="mt-4">{action}</div>}
-    </Card>
+      {(action || secondaryAction) && (
+        <div className="flex items-center gap-3">
+          {action}
+          {secondaryAction}
+        </div>
+      )}
+    </div>
   );
 }

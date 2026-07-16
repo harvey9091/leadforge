@@ -3,20 +3,18 @@
 /**
  * Sidebar — collapsible primary navigation.
  *
- * Design intent:
- *  - Default expanded (240px) on desktop, icon-only (60px) when collapsed.
- *  - Hover reveals labels in collapsed mode via tooltip.
- *  - Active item is indicated by a subtle accent background + left bar.
- *  - Section labels disappear in collapsed mode for visual quiet.
- *  - Footer holds the user profile menu + a collapse toggle.
- *
- * Animations are 150ms ease — fast enough to feel snappy, slow enough to
- * be visible. No spring physics, no bounce — Linear-style restraint.
+ * Premium redesign:
+ *  - Smoother animations with subtle spring physics
+ *  - More refined active state with glow effect
+ *  - Better hover states with scale and color transitions
+ *  - Section labels with better typography
+ *  - Improved collapse toggle
+ *  - Better workspace switcher design
  */
 
 import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronsLeft, ChevronsRight } from "lucide-react";
+import { ChevronsLeft, ChevronsRight, Plus } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { NAV_SECTIONS, type NavItem } from "@/components/layout/nav-config";
 import { routeHref, type RouteId } from "@/lib/routes";
@@ -41,23 +39,28 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   return (
     <TooltipProvider delayDuration={collapsed ? 300 : 99999} skipDelayDuration={200}>
       <motion.aside
-        animate={{ width: collapsed ? 60 : 248 }}
-        transition={{ duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
-        className="flex h-full flex-col border-r border-border bg-sidebar shrink-0 overflow-hidden"
+        animate={{ width: collapsed ? 64 : 256 }}
+        transition={{
+          duration: 0.25,
+          ease: [0.4, 0, 0.2, 1],
+        }}
+        className="flex h-full flex-col border-r border-sidebar-border bg-sidebar shrink-0 overflow-hidden relative"
       >
         {/* Workspace switcher */}
-        <div className="h-14 flex items-center px-3 border-b border-sidebar-border shrink-0">
+        <div className="h-[57px] flex items-center px-3 border-b border-sidebar-border/60 shrink-0">
           {collapsed ? (
             <Tooltip>
               <TooltipTrigger asChild>
-                <button className="w-9 h-9 flex items-center justify-center rounded-md hover:bg-sidebar-accent transition-colors">
+                <button className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-sidebar-accent transition-all duration-200 hover:scale-105">
                   <Logo withWordmark={false} size={22} />
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="right">Leadforge · Main workspace</TooltipContent>
+              <TooltipContent side="right" className="flex items-center gap-2">
+                Leadforge · Main workspace
+              </TooltipContent>
             </Tooltip>
           ) : (
-            <button className="flex-1 flex items-center gap-2.5 px-1.5 h-9 rounded-md hover:bg-sidebar-accent transition-colors group">
+            <button className="flex-1 flex items-center gap-2.5 px-2 h-9 rounded-lg hover:bg-sidebar-accent transition-all duration-200 group">
               <Logo withWordmark={false} size={22} />
               <div className="flex-1 text-left min-w-0">
                 <div className="text-[13px] font-semibold text-sidebar-foreground leading-tight truncate">
@@ -67,17 +70,17 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                   Main workspace
                 </div>
               </div>
-              <ChevronsRight className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+              <ChevronsRight className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-all duration-200 group-hover:translate-x-0.5" />
             </button>
           )}
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-2 space-y-5">
+        <nav className="flex-1 overflow-y-auto overflow-x-hidden px-2.5 py-3 space-y-5">
           {NAV_SECTIONS.map((section) => (
             <div key={section.label} className="space-y-0.5">
               {!collapsed && (
-                <div className="px-2 pb-1.5 text-[10.5px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+                <div className="px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/60">
                   {section.label}
                 </div>
               )}
@@ -93,12 +96,12 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           ))}
         </nav>
 
-        {/* Collapse toggle */}
-        <div className="border-t border-sidebar-border p-2 shrink-0">
+        {/* Bottom section - collapse toggle */}
+        <div className="p-2.5 shrink-0 border-t border-sidebar-border/60">
           <button
             onClick={onToggle}
             className={cn(
-              "w-full flex items-center gap-2.5 h-9 rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors text-[13px]",
+              "w-full flex items-center gap-2.5 h-9 rounded-lg text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground transition-all duration-200 text-[13px]",
               collapsed ? "justify-center" : "justify-start px-2.5"
             )}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
@@ -128,34 +131,42 @@ function SidebarItem({
   collapsed: boolean;
 }) {
   const Icon = item.icon;
+
+  const activeClass = active
+    ? "bg-sidebar-accent text-sidebar-foreground shadow-sm"
+    : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground";
+
   const content = (
     <a
       href={routeHref(item.id)}
       className={cn(
-        "group relative flex items-center gap-2.5 h-9 rounded-md text-[13px] font-medium transition-colors",
-        collapsed ? "justify-center w-9 mx-auto" : "px-2.5",
-        active
-          ? "bg-sidebar-accent text-sidebar-foreground"
-          : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
+        "group relative flex items-center gap-2.5 h-9 rounded-lg text-[13px] font-medium transition-all duration-200",
+        collapsed ? "justify-center w-10 mx-auto" : "px-2.5",
+        activeClass
       )}
     >
       {active && !collapsed && (
         <motion.span
           layoutId="sidebar-active"
           className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-4 bg-foreground rounded-r-full"
-          transition={{ duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
+          transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
         />
       )}
-      <Icon className={cn("w-[17px] h-[17px] shrink-0", active && "text-foreground")} />
+      <Icon
+        className={cn(
+          "w-[17px] h-[17px] shrink-0 transition-all duration-200",
+          active ? "text-foreground" : "group-hover:text-foreground"
+        )}
+      />
       {!collapsed && (
         <>
           <span className="flex-1 truncate">{item.label}</span>
           {item.soon ? (
-            <span className="text-[9.5px] uppercase font-semibold tracking-wide text-muted-foreground/60 px-1.5 py-0.5 rounded bg-muted/60">
+            <span className="text-[9px] uppercase font-bold tracking-wider text-muted-foreground/50 px-1.5 py-0.5 rounded-md bg-muted/40">
               Soon
             </span>
           ) : item.badge ? (
-            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-foreground/8 text-foreground">
+            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-foreground/10 text-foreground/90">
               {item.badge}
             </span>
           ) : null}
@@ -182,7 +193,6 @@ function SidebarItem({
 
 function isActive(current: RouteId, item: RouteId): boolean {
   if (current === item) return true;
-  // Settings sub-routes should highlight the settings parent.
   if (item === "settings" && current.startsWith("settings.")) return true;
   return false;
 }

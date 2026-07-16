@@ -3,13 +3,15 @@
 /**
  * Leads page — the primary workspace for sales teams.
  *
- * Renders the full enterprise DataTable wired to /api/v1/companies with
- * the lead-focused default columns (grade, score, status, owner, last
- * activity). Includes bulk selection, filtering, and CSV export placeholder.
+ * Premium redesign:
+ *  - Refined filter chips with better states
+ *  - Cleaner table toolbar
+ *  - Better action buttons
  */
 
 import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useDeferredValue } from "react";
 import { type ColumnDef, type SortingState } from "@tanstack/react-table";
 import {
   Download,
@@ -82,7 +84,7 @@ export function LeadsPage() {
   const [selected, setSelected] = React.useState<string[]>([]);
 
   // Debounce search
-  const debouncedSearch = React.useDeferredValue(search);
+  const debouncedSearch = useDeferredValue(search);
 
   const sortParam = sorting[0]
     ? `${sorting[0].id}:${sorting[0].desc ? "desc" : "asc"}`
@@ -243,7 +245,7 @@ export function LeadsPage() {
         description="Qualified companies and people in your active pipeline."
         actions={
           <>
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={onExport}>
+            <Button variant="outline" size="sm" className="gap-1.5 border-border/60" onClick={onExport}>
               <Download className="w-3.5 h-3.5" />
               Export
             </Button>
@@ -253,8 +255,8 @@ export function LeadsPage() {
       />
 
       {/* Filter chips */}
-      <div className="flex items-center gap-1.5 mb-4 flex-wrap">
-        <div className="flex items-center gap-1 text-[11.5px] text-muted-foreground mr-1">
+      <div className="flex items-center gap-1.5 mb-5 flex-wrap">
+        <div className="flex items-center gap-1 text-[11.5px] text-muted-foreground mr-1 font-medium">
           <Filter className="w-3 h-3" />
           Status:
         </div>
@@ -327,9 +329,9 @@ function FilterChip({
     <button
       onClick={onClick}
       className={cn(
-        "h-7 px-2.5 rounded-md text-[11.5px] font-medium border transition-colors",
+        "h-7 px-2.5 rounded-md text-[11.5px] font-medium border transition-all duration-200",
         active
-          ? "bg-foreground text-background border-foreground"
+          ? "bg-foreground text-background border-foreground shadow-sm"
           : "bg-transparent text-muted-foreground border-border hover:bg-muted/60 hover:text-foreground"
       )}
     >

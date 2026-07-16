@@ -3,17 +3,10 @@
 /**
  * AppShell — the dashboard layout wrapper.
  *
- * Layout:
- *  ┌─────────┬───────────────────────────────┐
- *  │         │ Topbar                         │
- *  │ Sidebar ├───────────────────────────────┤
- *  │         │ <main> page content </main>    │
- *  │         │                                │
- *  └─────────┴───────────────────────────────┘
- *
- * Sidebar collapse state is persisted in localStorage so it survives
- * reloads. The collapsed width on mobile is handled by hiding the sidebar
- * entirely and using a Sheet (drawer).
+ * Premium redesign:
+ *  - Cleaner spacing and proportions
+ *  - Better handling of sidebar collapse state
+ *  - Improved mobile experience
  */
 
 import * as React from "react";
@@ -25,13 +18,11 @@ import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 const SIDEBAR_KEY = "lf:sidebar:collapsed";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const [collapsed, setCollapsed] = React.useState(false);
-
-  // Hydrate from localStorage
-  React.useEffect(() => {
+  const [collapsed, setCollapsed] = React.useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
     const stored = localStorage.getItem(SIDEBAR_KEY);
-    if (stored === "1") setCollapsed(true);
-  }, []);
+    return stored === "1";
+  });
 
   const toggle = React.useCallback(() => {
     setCollapsed((c) => {

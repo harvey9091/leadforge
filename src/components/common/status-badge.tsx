@@ -3,9 +3,11 @@
 /**
  * StatusBadge — semantic status pill with consistent colors.
  *
- * Maps Leadforge domain statuses to color tokens. Every status in the
- * product has a defined color so the user learns the visual language
- * over time.
+ * Premium redesign:
+ *  - More refined badge styling
+ *  - Better spacing and typography
+ *  - Subtle dot indicator
+ *  - Cleaner borders
  */
 
 import * as React from "react";
@@ -13,11 +15,11 @@ import { cn } from "@/lib/utils";
 import { type VariantProps, cva } from "class-variance-authority";
 
 const statusVariants = cva(
-  "inline-flex items-center gap-1 text-[10.5px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded-md border",
+  "inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md border",
   {
     variants: {
       tone: {
-        neutral: "bg-muted/50 text-muted-foreground border-border/60",
+        neutral: "bg-muted/50 text-muted-foreground border-border/50",
         info: "bg-info/10 text-info border-info/20",
         success: "bg-success/10 text-success border-success/20",
         warning: "bg-warning/10 text-warning-foreground border-warning/30",
@@ -81,7 +83,7 @@ export function StatusBadge({
 
   return (
     <span className={cn(statusVariants({ tone: resolvedTone }), className)}>
-      <span className="w-1 h-1 rounded-full bg-current opacity-60" />
+      <span className="w-1 h-1 rounded-full bg-current" />
       {text}
     </span>
   );
@@ -95,14 +97,14 @@ export function GradeBadge({ grade, className }: { grade: string; className?: st
     grade === "A"
       ? "success"
       : grade === "B"
-      ? "info"
-      : grade === "C"
-      ? "warning"
-      : "danger";
+        ? "info"
+        : grade === "C"
+          ? "warning"
+          : "danger";
   return (
     <span
       className={cn(
-        "inline-flex items-center justify-center w-6 h-6 rounded-md text-[11px] font-bold border",
+        "inline-flex items-center justify-center w-7 h-7 rounded-lg text-[12px] font-bold border",
         tone === "success" && "bg-success/10 text-success border-success/20",
         tone === "info" && "bg-info/10 text-info border-info/20",
         tone === "warning" && "bg-warning/10 text-warning-foreground border-warning/30",

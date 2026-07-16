@@ -1,5 +1,15 @@
 "use client";
 
+/**
+ * Integrations — single source of truth for all external service configuration.
+ *
+ * Premium redesign:
+ *  - Better card layout with refined hover states
+ *  - Cleaner status indicators
+ *  - Better modal styling
+ *  - More polished overall feel
+ */
+
 import * as React from "react";
 import { SettingsSection } from "../settings-section";
 import { Badge } from "@/components/ui/badge";
@@ -29,7 +39,6 @@ import {
   Database,
   Search,
   Scan,
-  Server,
   Loader2,
   CheckCircle2,
   XCircle,
@@ -275,10 +284,10 @@ export function IntegrationsSection() {
     };
     return (
       <div className="flex items-center gap-2">
-        <Badge variant="secondary" className={cn("text-[10px] uppercase tracking-wide", colors[status] || colors.unknown)}>
+        <Badge variant="secondary" className={cn("text-[10px] uppercase tracking-wide font-semibold", colors[status] || colors.unknown)}>
           {status}
         </Badge>
-        {latencyMs != null && <span className="text-[11px] text-muted-foreground">{latencyMs}ms</span>}
+        {latencyMs != null && <span className="text-[11px] text-muted-foreground tabular-nums">{latencyMs}ms</span>}
       </div>
     );
   }
@@ -288,36 +297,36 @@ export function IntegrationsSection() {
       <Dialog open={modalOpen && modalIntegrationId === "freellm"} onOpenChange={setModalOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Configure FreeLLM</DialogTitle>
+            <DialogTitle className="text-[16px] font-semibold">Configure FreeLLM</DialogTitle>
             <DialogDescription>
               Connect to your FreeLLM-compatible LLM gateway for AI qualification.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <Label className="text-[12px]">Base URL</Label>
+              <Label className="text-[12.5px] font-medium">Base URL</Label>
               <Input
                 value={baseUrl}
                 onChange={(e) => setBaseUrl(e.target.value)}
                 placeholder="https://68.233.114.213:3002/v1"
-                className="h-8 text-[13px]"
+                className="h-9 text-[13px]"
               />
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-[12px]">API Key</Label>
+              <Label className="text-[12.5px] font-medium">API Key</Label>
               <div className="relative">
                 <Input
                   type={showKey ? "text" : "password"}
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
                   placeholder={configs.get("freellm")?.apiKeySet ? "••••••••••••••••" : "Enter API key"}
-                  className="h-8 text-[13px] pr-9"
+                  className="h-9 text-[13px] pr-9"
                 />
                 <button
                   type="button"
                   onClick={() => setShowKey(!showKey)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                 >
                   {showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                 </button>
@@ -325,9 +334,9 @@ export function IntegrationsSection() {
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-[12px]">Model</Label>
+              <Label className="text-[12.5px] font-medium">Model</Label>
               <Select value="auto" onValueChange={() => {}}>
-                <SelectTrigger className="h-8 text-[13px]">
+                <SelectTrigger className="h-9 text-[13px]">
                   <SelectValue placeholder="Auto (server default)" />
                 </SelectTrigger>
                 <SelectContent>
@@ -339,19 +348,19 @@ export function IntegrationsSection() {
             {testResult && (
               <div
                 className={cn(
-                  "rounded-md border p-2.5 flex items-start gap-2 text-[12.5px]",
+                  "rounded-lg border p-3 flex items-start gap-2.5 text-[12.5px]",
                   testResult.success
                     ? "border-success/30 bg-success/[0.04]"
                     : "border-destructive/30 bg-destructive/[0.04]"
                 )}
               >
                 {testResult.success ? (
-                  <CheckCircle2 className="w-3.5 h-3.5 text-success shrink-0 mt-0.5" />
+                  <CheckCircle2 className="w-4 h-4 text-success shrink-0 mt-0.5" />
                 ) : (
-                  <XCircle className="w-3.5 h-3.5 text-destructive shrink-0 mt-0.5" />
+                  <XCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
                 )}
                 <div className="flex-1">
-                  <span className={cn("font-medium", testResult.success ? "text-success" : "text-destructive")}>
+                  <span className={cn("font-semibold", testResult.success ? "text-success" : "text-destructive")}>
                     {testResult.success ? "Connected" : "Connection failed"}
                   </span>
                   {testResult.success && testResult.latencyMs != null && (
@@ -391,7 +400,7 @@ export function IntegrationsSection() {
                       )}
                       {!testResult.httpStatus && !testResult.authRequired && (
                         <p className="text-muted-foreground text-[11px]">
-                          Suggestion: Check Base URL, firewall rules, and that Server 2 (68.233.114.213) is reachable on the specified port.
+                          Suggestion: Check Base URL, firewall rules, and that Server 2 is reachable on the specified port.
                         </p>
                       )}
                     </div>
@@ -402,38 +411,38 @@ export function IntegrationsSection() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-[12px]">Timeout (ms)</Label>
+                <Label className="text-[12.5px] font-medium">Timeout (ms)</Label>
                 <Input
                   type="number"
                   min={1000}
                   max={600000}
                   value={timeout}
                   onChange={(e) => setTimeoutValue(parseInt(e.target.value) || 60000)}
-                  className="h-8 text-[13px]"
+                  className="h-9 text-[13px]"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-[12px]">Max Retries</Label>
+                <Label className="text-[12.5px] font-medium">Max Retries</Label>
                 <Input
                   type="number"
                   min={0}
                   max={10}
                   value={maxRetries}
                   onChange={(e) => setMaxRetries(parseInt(e.target.value) || 2)}
-                  className="h-8 text-[13px]"
+                  className="h-9 text-[13px]"
                 />
               </div>
             </div>
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" size="sm" className="h-8 text-[12px]" onClick={handleTest} disabled={testing || !baseUrl}>
-              {testing ? <><Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />Testing…</> : "Test Connection"}
+            <Button variant="outline" size="sm" className="h-8 text-[12.5px]" onClick={handleTest} disabled={testing || !baseUrl}>
+              {testing ? <><Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />Testing…</> : "Test Connection"}
             </Button>
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" className="h-8 text-[12px]" onClick={closeModal}>
+              <Button variant="ghost" size="sm" className="h-8 text-[12.5px]" onClick={closeModal}>
                 Cancel
               </Button>
-              <Button size="sm" className="h-8 text-[12px]" onClick={handleSave} disabled={saving || !baseUrl}>
+              <Button size="sm" className="h-8 text-[12.5px]" onClick={handleSave} disabled={saving || !baseUrl}>
                 {saving ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Saving…</> : "Save"}
               </Button>
             </div>
@@ -448,36 +457,36 @@ export function IntegrationsSection() {
       <Dialog open={modalOpen && modalIntegrationId === "firecrawl"} onOpenChange={setModalOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Configure Firecrawl</DialogTitle>
+            <DialogTitle className="text-[16px] font-semibold">Configure Firecrawl</DialogTitle>
             <DialogDescription>
               Connect to your Firecrawl instance for web scraping and content extraction.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <Label className="text-[12px]">Base URL</Label>
+              <Label className="text-[12.5px] font-medium">Base URL</Label>
               <Input
                 value={baseUrl}
                 onChange={(e) => setBaseUrl(e.target.value)}
                 placeholder="https://68.233.114.213:3003"
-                className="h-8 text-[13px]"
+                className="h-9 text-[13px]"
               />
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-[12px]">API Key</Label>
+              <Label className="text-[12.5px] font-medium">API Key</Label>
               <div className="relative">
                 <Input
                   type={showKey ? "text" : "password"}
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
                   placeholder={configs.get("firecrawl")?.apiKeySet ? "••••••••••••••••" : "Enter API key"}
-                  className="h-8 text-[13px] pr-9"
+                  className="h-9 text-[13px] pr-9"
                 />
                 <button
                   type="button"
                   onClick={() => setShowKey(!showKey)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                 >
                   {showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                 </button>
@@ -487,19 +496,19 @@ export function IntegrationsSection() {
             {testResult && (
               <div
                 className={cn(
-                  "rounded-md border p-2.5 flex items-start gap-2 text-[12.5px]",
+                  "rounded-lg border p-3 flex items-start gap-2.5 text-[12.5px]",
                   testResult.success
                     ? "border-success/30 bg-success/[0.04]"
                     : "border-destructive/30 bg-destructive/[0.04]"
                 )}
               >
                 {testResult.success ? (
-                  <CheckCircle2 className="w-3.5 h-3.5 text-success shrink-0 mt-0.5" />
+                  <CheckCircle2 className="w-4 h-4 text-success shrink-0 mt-0.5" />
                 ) : (
-                  <XCircle className="w-3.5 h-3.5 text-destructive shrink-0 mt-0.5" />
+                  <XCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
                 )}
                 <div className="flex-1">
-                  <span className={cn("font-medium", testResult.success ? "text-success" : "text-destructive")}>
+                  <span className={cn("font-semibold", testResult.success ? "text-success" : "text-destructive")}>
                     {testResult.success ? "Connected" : "Connection failed"}
                   </span>
                   {testResult.success && testResult.latencyMs != null && (
@@ -541,7 +550,7 @@ export function IntegrationsSection() {
                       )}
                       {!testResult.httpStatus && !testResult.authRequired && (
                         <p className="text-muted-foreground text-[11px]">
-                          Suggestion: Check Base URL, firewall rules, and that Server 2 (68.233.114.213) is reachable on the specified port.
+                          Suggestion: Check Base URL, firewall rules, and that Server 2 is reachable on the specified port.
                         </p>
                       )}
                     </div>
@@ -555,38 +564,38 @@ export function IntegrationsSection() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-[12px]">Timeout (ms)</Label>
+                <Label className="text-[12.5px] font-medium">Timeout (ms)</Label>
                 <Input
                   type="number"
                   min={1000}
                   max={300000}
                   value={timeout}
                   onChange={(e) => setTimeoutValue(parseInt(e.target.value) || 30000)}
-                  className="h-8 text-[13px]"
+                  className="h-9 text-[13px]"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-[12px]">Max Retries</Label>
+                <Label className="text-[12.5px] font-medium">Max Retries</Label>
                 <Input
                   type="number"
                   min={0}
                   max={10}
                   value={maxRetries}
                   onChange={(e) => setMaxRetries(parseInt(e.target.value) || 2)}
-                  className="h-8 text-[13px]"
+                  className="h-9 text-[13px]"
                 />
               </div>
             </div>
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" size="sm" className="h-8 text-[12px]" onClick={handleTest} disabled={testing || !baseUrl}>
-              {testing ? <><Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />Testing…</> : "Test Connection"}
+            <Button variant="outline" size="sm" className="h-8 text-[12.5px]" onClick={handleTest} disabled={testing || !baseUrl}>
+              {testing ? <><Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />Testing…</> : "Test Connection"}
             </Button>
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" className="h-8 text-[12px]" onClick={closeModal}>
+              <Button variant="ghost" size="sm" className="h-8 text-[12.5px]" onClick={closeModal}>
                 Cancel
               </Button>
-              <Button size="sm" className="h-8 text-[12px]" onClick={handleSave} disabled={saving || !baseUrl}>
+              <Button size="sm" className="h-8 text-[12.5px]" onClick={handleSave} disabled={saving || !baseUrl}>
                 {saving ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Saving…</> : "Save"}
               </Button>
             </div>
@@ -603,12 +612,12 @@ export function IntegrationsSection() {
       footer={
         <div className="flex items-center justify-between">
           <p className="text-[11.5px] text-muted-foreground">
-            All services must be reachable from Server 1 (LeadForge).
+            All services must be reachable from the LeadForge server.
           </p>
           <Button
             variant="outline"
             size="sm"
-            className="h-7 text-[11.5px] gap-1"
+            className="h-7 text-[11.5px] gap-1.5 border-border/60"
             onClick={loadAll}
             disabled={loading}
           >
@@ -626,21 +635,21 @@ export function IntegrationsSection() {
           return (
             <div
               key={int.id}
-              className="flex items-center gap-3 px-3 py-3 rounded-md border border-border/60 bg-background/40"
+              className="flex items-center gap-3 px-4 py-3.5 rounded-xl border border-border/60 bg-background/40 hover:bg-background/60 hover:border-border/80 transition-all duration-200 group"
             >
-              <div className="w-9 h-9 rounded-md bg-muted/40 flex items-center justify-center text-foreground shrink-0">
-                <Icon className="w-4 h-4" />
+              <div className="w-10 h-10 rounded-xl bg-muted/40 flex items-center justify-center text-foreground shrink-0 group-hover:scale-105 transition-transform duration-200">
+                <Icon className="w-5 h-5" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-[13px] font-medium text-foreground">{int.name}</span>
+                  <span className="text-[13.5px] font-semibold text-foreground">{int.name}</span>
                   {config?.apiKeySet && (
-                    <Badge variant="outline" className="text-[9px] uppercase tracking-wide text-muted-foreground border-muted-foreground/20">Key Set</Badge>
+                    <Badge variant="outline" className="text-[9px] uppercase tracking-wider text-muted-foreground border-muted-foreground/20 font-semibold">Key Set</Badge>
                   )}
                 </div>
                 <div className="text-[11.5px] text-muted-foreground mt-0.5">{int.description}</div>
                 {status && (
-                  <div className="mt-1">
+                  <div className="mt-1.5">
                     {getStatusBadge(status.status, status.latencyMs)}
                   </div>
                 )}
@@ -649,7 +658,7 @@ export function IntegrationsSection() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 text-[11px] gap-1"
+                  className="h-8 text-[12px] gap-1.5"
                   onClick={() => handleReconnect(int.id)}
                 >
                   <RefreshCw className="w-3 h-3" />
@@ -658,7 +667,7 @@ export function IntegrationsSection() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-7 text-[11px]"
+                  className="h-8 text-[12px] border-border/60"
                   onClick={() => openModal(int.id)}
                 >
                   Configure

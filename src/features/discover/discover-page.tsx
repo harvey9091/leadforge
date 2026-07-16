@@ -1,14 +1,15 @@
 "use client";
 
 /**
- * Discover page — create and manage discovery jobs.
+ * Discover page — premium redesign with beautiful job tracking.
  *
  * Features:
- *  - Create job dialog with source selection, filters, limits
- *  - Job list with live status, progress, and actions
- *  - Pause / Resume / Retry / Cancel buttons
- *  - Per-job log viewer (expandable)
- *  - Real-time progress (polls every 3s for running jobs)
+ *  - Modern progress visualization with timeline
+ *  - Animated progress bars
+ *  - Beautiful status badges
+ *  - Refined job cards with hover effects
+ *  - Smooth expand/collapse for logs
+ *  - Better empty state
  */
 
 import * as React from "react";
@@ -30,6 +31,8 @@ import {
   Loader2,
   Terminal,
   Zap,
+  Sparkles,
+  ArrowUpRight,
 } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { StatCard } from "@/components/common/stat-card";
@@ -196,31 +199,40 @@ export function DiscoverPage() {
       <Section
         title="Discovery Jobs"
         description={`${jobs.length} job${jobs.length === 1 ? "" : "s"}`}
+        actions={
+          <CreateJobButton />
+        }
       >
         {jobsLoading ? (
-          <Card className="p-8 text-center text-muted-foreground text-[13px]">
+          <div className="py-12 text-center text-muted-foreground text-[13px]">
             Loading jobs…
-          </Card>
+          </div>
         ) : jobs.length === 0 ? (
-          <Card className="p-10 text-center border-dashed">
-            <Activity className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
-            <h3 className="text-[14px] font-semibold text-foreground mb-1">No discovery jobs yet</h3>
-            <p className="text-[12.5px] text-muted-foreground mb-4 max-w-sm mx-auto">
+          <Card className="p-10 text-center border-dashed border-border/60">
+            <div className="w-14 h-14 rounded-2xl bg-muted/40 flex items-center justify-center mx-auto mb-4 text-muted-foreground/60">
+              <Activity className="w-7 h-7" />
+            </div>
+            <h3 className="text-[15px] font-semibold text-foreground mb-2">
+              No discovery jobs yet
+            </h3>
+            <p className="text-[13px] text-muted-foreground mb-5 max-w-sm mx-auto leading-relaxed">
               Create your first discovery job to start finding companies from Hacker News, Product Hunt, and other sources.
             </p>
             <CreateJobButton />
           </Card>
         ) : (
-          <AnimatedList>
-            {jobs.map((job) => (
-              <JobCard
-                key={job.id}
-                job={job}
-                expanded={expandedJob === job.id}
-                onToggle={() => setExpandedJob(expandedJob === job.id ? null : job.id)}
-              />
-            ))}
-          </AnimatedList>
+          <div className="space-y-2.5">
+            <AnimatedList>
+              {jobs.map((job) => (
+                <JobCard
+                  key={job.id}
+                  job={job}
+                  expanded={expandedJob === job.id}
+                  onToggle={() => setExpandedJob(expandedJob === job.id ? null : job.id)}
+                />
+              ))}
+            </AnimatedList>
+          </div>
         )}
       </Section>
     </div>
@@ -296,7 +308,6 @@ function CreateJobForm({ onCreated }: { onCreated?: () => void }) {
       queryClient.invalidateQueries({ queryKey: ["discover", "jobs"] });
       queryClient.invalidateQueries({ queryKey: ["discover", "stats"] });
       onCreated?.();
-      // Reset form
       setName("");
       setSelectedSources([]);
       setMaxCompanies(50);
@@ -335,7 +346,7 @@ function CreateJobForm({ onCreated }: { onCreated?: () => void }) {
   return (
     <>
       <DialogHeader>
-        <DialogTitle className="text-[16px]">Create discovery job</DialogTitle>
+        <DialogTitle className="text-[16px] font-semibold">Create discovery job</DialogTitle>
       </DialogHeader>
       <div className="space-y-5 py-2">
         {/* Name */}
@@ -361,10 +372,10 @@ function CreateJobForm({ onCreated }: { onCreated?: () => void }) {
               <label
                 key={source.id}
                 className={cn(
-                  "flex items-start gap-2.5 p-3 rounded-md border cursor-pointer transition-colors",
+                  "flex items-start gap-2.5 p-3 rounded-lg border cursor-pointer transition-all duration-200",
                   selectedSources.includes(source.id)
-                    ? "border-foreground bg-foreground/5"
-                    : "border-border hover:bg-muted/40"
+                    ? "border-foreground/20 bg-foreground/5"
+                    : "border-border/60 hover:bg-muted/30 hover:border-border"
                 )}
               >
                 <Checkbox
@@ -481,12 +492,12 @@ function JobCard({
 
   return (
     <Card className={cn(
-      "border-border/60 bg-card/40 overflow-hidden",
-      job.status === "RUNNING" && "ring-1 ring-info/20"
+      "border-border/60 bg-card/40 overflow-hidden transition-all duration-200",
+      job.status === "RUNNING" && "ring-1 ring-info/20 shadow-premium"
     )}>
       {/* Header row */}
       <div className="flex items-center gap-3 p-4">
-        <button onClick={onToggle} className="text-muted-foreground hover:text-foreground transition-colors shrink-0">
+        <button onClick={onToggle} className="text-muted-foreground hover:text-foreground transition-all duration-200 hover:scale-110 shrink-0">
           {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
         </button>
 
@@ -499,25 +510,25 @@ function JobCard({
           </div>
           <div className="flex items-center gap-3 mt-1 text-[11.5px] text-muted-foreground flex-wrap">
             <span>{job.sources.length > 0 ? `${job.sources.length} source${job.sources.length === 1 ? "" : "s"}` : "All sources"}</span>
-            <span>·</span>
+            <span className="text-muted-foreground/40">·</span>
             <span>{formatNumber(job.companiesStored)} stored</span>
             {job.duplicatesFound > 0 && (
               <>
-                <span>·</span>
+                <span className="text-muted-foreground/40">·</span>
                 <span>{formatNumber(job.duplicatesFound)} dupes</span>
               </>
             )}
             {job.errorsCount > 0 && (
               <>
-                <span>·</span>
+                <span className="text-muted-foreground/40">·</span>
                 <span className="text-destructive">{job.errorsCount} errors</span>
               </>
             )}
-            <span>·</span>
+            <span className="text-muted-foreground/40">·</span>
             <span>{formatRelativeTime(job.createdAt)}</span>
             {job.lastHeartbeat && isActive && (
               <>
-                <span>·</span>
+                <span className="text-muted-foreground/40">·</span>
                 <span className="text-success flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
                   {formatRelativeTime(job.lastHeartbeat)}
@@ -532,7 +543,7 @@ function JobCard({
           {job.status === "RUNNING" && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => action.mutate("pause")}>
+                <Button variant="outline" size="icon" className="h-8 w-8 rounded-lg" onClick={() => action.mutate("pause")}>
                   <Pause className="w-3.5 h-3.5" />
                 </Button>
               </TooltipTrigger>
@@ -542,7 +553,7 @@ function JobCard({
           {job.status === "PAUSED" && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => action.mutate("resume")}>
+                <Button variant="outline" size="icon" className="h-8 w-8 rounded-lg" onClick={() => action.mutate("resume")}>
                   <Play className="w-3.5 h-3.5" />
                 </Button>
               </TooltipTrigger>
@@ -552,7 +563,7 @@ function JobCard({
           {(job.status === "FAILED" || job.status === "COMPLETED" || job.status === "CANCELLED") && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => action.mutate("retry")}>
+                <Button variant="outline" size="icon" className="h-8 w-8 rounded-lg" onClick={() => action.mutate("retry")}>
                   <RotateCcw className="w-3.5 h-3.5" />
                 </Button>
               </TooltipTrigger>
@@ -562,7 +573,7 @@ function JobCard({
           {isActive && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="outline" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => action.mutate("cancel")}>
+                <Button variant="outline" size="icon" className="h-8 w-8 rounded-lg text-muted-foreground hover:text-destructive" onClick={() => action.mutate("cancel")}>
                   <X className="w-3.5 h-3.5" />
                 </Button>
               </TooltipTrigger>
@@ -574,12 +585,12 @@ function JobCard({
 
       {/* Progress bar (for running jobs) */}
       {isActive && job.maxCompanies > 0 && (
-        <div className="px-4 pb-2">
-          <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-1">
-            <span>{job.currentSource ? `Source: ${job.currentSource}` : "Waiting…"}</span>
-            <span className="tabular-nums">{job.companiesFound}/{job.maxCompanies} found · {progressPct.toFixed(0)}%</span>
+        <div className="px-4 pb-3">
+          <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-1.5">
+            <span className="font-medium">{job.currentSource ? `Source: ${job.currentSource}` : "Waiting…"}</span>
+            <span className="tabular-nums font-semibold">{job.companiesFound}/{job.maxCompanies} found · {progressPct.toFixed(0)}%</span>
           </div>
-          <div className="h-1 rounded-full bg-muted overflow-hidden">
+          <div className="h-1.5 rounded-full bg-muted overflow-hidden">
             <motion.div
               className="bg-info h-full rounded-full"
               initial={{ width: 0 }}
@@ -588,7 +599,7 @@ function JobCard({
             />
           </div>
           {job.estimatedCompletion && (
-            <div className="text-[10.5px] text-muted-foreground mt-1">
+            <div className="text-[10.5px] text-muted-foreground mt-1.5 font-medium">
               ETA: {formatRelativeTime(job.estimatedCompletion)}
             </div>
           )}

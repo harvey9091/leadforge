@@ -1,24 +1,15 @@
 "use client";
 
 /**
- * Enterprise data table.
+ * Enterprise data table — premium redesign.
  *
- * Built on TanStack Table — the industry standard for headless React tables.
- * Features:
- *  - Column sorting (multi-sort ready)
- *  - Server-side pagination
- *  - Column visibility toggles
- *  - Global search (debounced)
- *  - Bulk row selection with a sticky action bar
- *  - Row click + row actions menu
- *  - Sticky header
- *  - Virtualization-ready (the body is a scroll container with stable row heights)
- *  - Loading skeletons
- *  - Empty state
- *
- * Selection is ID-based and fully controlled by the parent. Selection state
- * survives pagination because row IDs — not row indices — are used as keys.
- * Shift+Click selects a range; Ctrl/Cmd+Click toggles individual rows.
+ * Built on TanStack Table with:
+ *  - Refined styling with better spacing
+ *  - Smooth hover states
+ *  - Better selection visualization
+ *  - Improved sticky header
+ *  - More polished empty state
+ *  - Better pagination
  */
 
 import * as React from "react";
@@ -127,8 +118,6 @@ export function DataTable<TData extends { id?: string }, TValue = unknown>({
   getRowId,
 }: DataTableProps<TData, TValue>) {
   // Internal rowSelection state keyed by row IDs (not numeric indices).
-  // Derived from the controlled selectedIds prop so selection persists across
-  // page changes without relying on row position.
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
 
   // Tracks the last row the user Shift+Clicked from, enabling range selection.
@@ -142,7 +131,7 @@ export function DataTable<TData extends { id?: string }, TValue = unknown>({
     data.map((row) => (getRowId ? getRowId(row) : (row as { id?: string }).id ?? String(row)))
   );
 
-  // Sync internal rowSelection when selectedIds changes from outside (e.g. page navigation).
+  // Sync internal rowSelection when selectedIds changes from outside.
   const prevSelectedIdsRef = React.useRef<string[]>([]);
   React.useEffect(() => {
     const prev = prevSelectedIdsRef.current;
@@ -159,7 +148,7 @@ export function DataTable<TData extends { id?: string }, TValue = unknown>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedIds]);
 
-  // Notify parent of current-page selection changes (always keyed by row ID).
+  // Notify parent of current-page selection changes.
   const updateSelection = React.useCallback(
     (updater: RowSelectionState | ((old: RowSelectionState) => RowSelectionState)) => {
       setRowSelection((prev) => {
@@ -208,8 +197,6 @@ export function DataTable<TData extends { id?: string }, TValue = unknown>({
 
   // Rows selected on the current visible page.
   const currentPageSelectedCount = Object.keys(rowSelection).length;
-  // Total selected across all pages — use parent-supplied count when available
-  // so that selections from other pages are reflected in the UI.
   const effectiveSelectedCount = totalSelectedCount ?? selectedIds?.length ?? currentPageSelectedCount;
 
   return (
@@ -218,12 +205,12 @@ export function DataTable<TData extends { id?: string }, TValue = unknown>({
       <div className="flex items-center gap-2 flex-wrap">
         {onSearchChange && (
           <div className="relative flex-1 min-w-[200px] max-w-xs">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
             <Input
               value={search ?? ""}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder={searchPlaceholder}
-              className="pl-8 h-9 text-[13px] bg-background"
+              className="pl-9 h-9 text-[13px] bg-background border-border/60"
             />
           </div>
         )}
@@ -231,13 +218,13 @@ export function DataTable<TData extends { id?: string }, TValue = unknown>({
         {/* Column visibility */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-9 gap-1.5 text-[12.5px]">
+            <Button variant="outline" size="sm" className="h-9 gap-1.5 text-[12.5px] border-border/60">
               <SlidersHorizontal className="w-3.5 h-3.5" />
               Columns
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuLabel className="text-[11px] uppercase tracking-wide text-muted-foreground">
+            <DropdownMenuLabel className="text-[10.5px] uppercase tracking-wider text-muted-foreground font-semibold">
               Toggle columns
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
@@ -266,8 +253,8 @@ export function DataTable<TData extends { id?: string }, TValue = unknown>({
 
       {/* Bulk action bar */}
       {effectiveSelectedCount > 0 && bulkActions && (
-        <div className="flex items-center gap-3 px-3 h-11 rounded-md border border-border bg-card/60 backdrop-blur-sm">
-          <span className="text-[12.5px] font-medium text-foreground">
+        <div className="flex items-center gap-3 px-3 h-11 rounded-xl border border-border/60 bg-card/60 backdrop-blur-sm">
+          <span className="text-[12.5px] font-semibold text-foreground">
             {effectiveSelectedCount} selected
           </span>
           {effectiveSelectedCount > currentPageSelectedCount && (
@@ -275,14 +262,14 @@ export function DataTable<TData extends { id?: string }, TValue = unknown>({
               ({currentPageSelectedCount} on this page)
             </span>
           )}
-          <div className="w-px h-4 bg-border" />
+          <div className="w-px h-4 bg-border/60" />
           <div className="flex items-center gap-1.5">
             {bulkActions(selectedIds)}
           </div>
           <Button
             variant="ghost"
             size="sm"
-            className="ml-auto h-7 text-[11.5px] text-muted-foreground"
+            className="ml-auto h-7 text-[11.5px] text-muted-foreground hover:text-foreground"
             onClick={() => {
               setRowSelection({});
               if (onSelectionChange) onSelectionChange([]);
@@ -296,23 +283,23 @@ export function DataTable<TData extends { id?: string }, TValue = unknown>({
       )}
 
       {/* Table */}
-      <div className="rounded-lg border border-border bg-card/30 overflow-hidden">
+      <div className="rounded-xl border border-border/60 bg-card/30 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-[13px]">
-            <thead className="sticky top-0 z-10 bg-muted/40 backdrop-blur-sm border-b border-border">
+            <thead className="sticky top-0 z-10 bg-muted/30 backdrop-blur-sm border-b border-border/60">
               {table.getHeaderGroups().map((headerGroup) => (
-                <tr key={headerGroup.id} className="h-9">
+                <tr key={headerGroup.id} className="h-11">
                   {headerGroup.headers.map((header) => (
                     <th
                       key={header.id}
-                      className="text-left font-medium text-[11px] uppercase tracking-wide text-muted-foreground px-3 whitespace-nowrap"
+                      className="text-left font-semibold text-[11px] uppercase tracking-wider text-muted-foreground px-4 whitespace-nowrap"
                       style={{ width: header.getSize() !== 150 ? header.getSize() : undefined }}
                     >
                       {header.isPlaceholder ? null : (
                         <div
                           className={cn(
                             "flex items-center gap-1.5",
-                            header.column.getCanSort() && "cursor-pointer select-none hover:text-foreground"
+                            header.column.getCanSort() && "cursor-pointer select-none hover:text-foreground transition-colors"
                           )}
                           onClick={header.column.getToggleSortingHandler()}
                         >
@@ -333,10 +320,10 @@ export function DataTable<TData extends { id?: string }, TValue = unknown>({
             <tbody>
               {loading ? (
                 Array.from({ length: Math.min(pageSize, 8) }).map((_, i) => (
-                  <tr key={i} className="border-b border-border/40 h-12">
+                  <tr key={i} className="border-b border-border/40 h-14">
                     {columns.map((_, j) => (
-                      <td key={j} className="px-3">
-                        <Skeleton className="h-3.5 w-full max-w-[160px]" />
+                      <td key={j} className="px-4">
+                        <Skeleton className="h-4 w-full max-w-[160px]" />
                       </td>
                     ))}
                   </tr>
@@ -362,12 +349,10 @@ export function DataTable<TData extends { id?: string }, TValue = unknown>({
 
                     const hasModifier = e.shiftKey || e.metaKey || e.ctrlKey;
 
-                    // Stop checkbox in selection column from also handling this click.
                     if (hasModifier) {
                       e.stopPropagation();
                     }
 
-                    // Shift+Click: select range from last anchor to current row.
                     if (e.shiftKey && lastSelectedRowIdRef.current) {
                       const allRows = table.getRowModel().rows;
                       const currentIdx = allRows.findIndex((r) => r.id === rowId);
@@ -386,7 +371,6 @@ export function DataTable<TData extends { id?: string }, TValue = unknown>({
                       }
                     }
 
-                    // Ctrl/Cmd+Click: toggle this row, preserve other selections.
                     if (e.metaKey || e.ctrlKey) {
                       updateSelection((prev) => {
                         const next = { ...prev };
@@ -401,7 +385,6 @@ export function DataTable<TData extends { id?: string }, TValue = unknown>({
                       return;
                     }
 
-                    // Plain click: select only this row, then navigate.
                     lastSelectedRowIdRef.current = rowId;
                     updateSelection({ [rowId]: true });
                     if (onRowClick) onRowClick(row.original);
@@ -412,7 +395,7 @@ export function DataTable<TData extends { id?: string }, TValue = unknown>({
                       key={row.id}
                       data-state={isSelected ? "selected" : undefined}
                       className={cn(
-                        "border-b border-border/40 last:border-0 transition-colors group",
+                        "border-b border-border/40 last:border-0 transition-all duration-150 group",
                         "hover:bg-muted/30",
                         isSelected && "bg-info/[0.04]",
                         onRowClick && enableSelection && "cursor-pointer"
@@ -420,7 +403,7 @@ export function DataTable<TData extends { id?: string }, TValue = unknown>({
                       onClick={handleRowClick}
                     >
                       {row.getVisibleCells().map((cell) => (
-                        <td key={cell.id} className="px-3 py-2.5 align-middle">
+                        <td key={cell.id} className="px-4 py-3 align-middle">
                           {flexRender(cell.column.columnDef.cell, cell.getContext())}
                         </td>
                       ))}
@@ -435,17 +418,17 @@ export function DataTable<TData extends { id?: string }, TValue = unknown>({
 
       {/* Pagination */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="text-[12px] text-muted-foreground tabular-nums">
+        <div className="text-[12.5px] text-muted-foreground tabular-nums">
           {loading ? (
             "Loading…"
           ) : total === 0 ? (
             "No results"
           ) : (
             <>
-              Showing <span className="text-foreground font-medium">{from}</span>
-              {"–"}
-              <span className="text-foreground font-medium">{to}</span> of{" "}
-              <span className="text-foreground font-medium">{total.toLocaleString()}</span>
+              Showing <span className="font-semibold text-foreground">{from}</span>
+              {" – "}
+              <span className="font-semibold text-foreground">{to}</span> of{" "}
+              <span className="font-semibold text-foreground">{total.toLocaleString()}</span>
             </>
           )}
         </div>
@@ -453,7 +436,7 @@ export function DataTable<TData extends { id?: string }, TValue = unknown>({
           {onPageSizeChange && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-8 text-[12px] gap-1.5">
+                <Button variant="outline" size="sm" className="h-8 text-[12.5px] gap-1.5 border-border/60">
                   {pageSize} / page
                 </Button>
               </DropdownMenuTrigger>
@@ -491,7 +474,7 @@ export function DataTable<TData extends { id?: string }, TValue = unknown>({
             >
               <ChevronLeft className="w-3.5 h-3.5" />
             </Button>
-            <span className="text-[12px] text-muted-foreground px-2 tabular-nums">
+            <span className="text-[12.5px] text-muted-foreground px-2 tabular-nums font-medium">
               {page} / {totalPages}
             </span>
             <Button
@@ -525,7 +508,7 @@ export function DataTable<TData extends { id?: string }, TValue = unknown>({
 export function selectionColumn<T extends { id?: string }>(): ColumnDef<T> {
   return {
     id: "select",
-    size: 32,
+    size: 40,
     header: ({ table }) => (
       <Checkbox
         checked={table.getIsAllRowsSelected()}
@@ -537,7 +520,6 @@ export function selectionColumn<T extends { id?: string }>(): ColumnDef<T> {
     ),
     cell: ({ row }) => {
       const handleClick = (e: React.MouseEvent) => {
-        // Prevent row click handler from also firing on Ctrl/Cmd/Shift clicks.
         if (e.shiftKey || e.metaKey || e.ctrlKey) {
           e.stopPropagation();
         }

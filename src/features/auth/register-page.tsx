@@ -3,14 +3,16 @@
 /**
  * Register page — create a new workspace account.
  *
- * First registered user becomes ADMIN (handled server-side). Subsequent
- * registrations default to USER role. After successful registration,
- * navigates to /dashboard.
+ * Premium redesign:
+ *  - Better form spacing
+ *  - Refined password strength indicators
+ *  - Better visual hierarchy
  */
 
 import * as React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { motion } from "framer-motion";
 import { ArrowRight, Eye, EyeOff, Check } from "lucide-react";
 import { AuthLayout } from "@/features/auth/auth-layout";
 import { Button } from "@/components/ui/button";
@@ -58,7 +60,13 @@ export function RegisterPage() {
 
   return (
     <AuthLayout title="Create your account" description="Start discovering qualified leads in minutes.">
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <motion.form
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.1 }}
+        onSubmit={form.handleSubmit(onSubmit)}
+        className="space-y-5"
+      >
         <div className="space-y-1.5">
           <Label htmlFor="name" className="text-[12.5px] font-medium">
             Full name
@@ -157,16 +165,21 @@ export function RegisterPage() {
           {submitting ? "Creating account…" : "Create account"}
           {!submitting && <ArrowRight className="w-4 h-4" />}
         </Button>
-      </form>
+      </motion.form>
 
-      <div className="mt-6 pt-6 border-t border-border/60 text-center">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.2 }}
+        className="mt-6 pt-6 border-t border-border/60 text-center"
+      >
         <p className="text-[12.5px] text-muted-foreground">
           Already have an account?{" "}
           <a href="#/login" className="text-foreground font-medium hover:underline">
             Sign in
           </a>
         </p>
-      </div>
+      </motion.div>
     </AuthLayout>
   );
 }

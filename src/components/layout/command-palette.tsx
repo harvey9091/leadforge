@@ -3,15 +3,10 @@
 /**
  * Command palette (⌘K) — central navigation, search, and quick action hub.
  *
- * Features:
- *  - Fuzzy search across all pages
- *  - Quick navigation with keyboard
- *  - Theme switching
- *  - Placeholder search for companies + leads (Phase 2 will hit the API)
- *  - Recent items
- *
- * The palette uses cmdk under the hood (via shadcn/ui Command). All items
- * are keyboard accessible — arrow keys, Enter, Escape.
+ * Premium redesign:
+ *  - Better dialog styling
+ *  - Refined item spacing
+ *  - Better visual hierarchy
  */
 
 import * as React from "react";
@@ -45,7 +40,6 @@ export function CommandPalette() {
   const setOpen = useCommandPalette((s) => s.setOpen);
   const { theme, setTheme } = useTheme();
 
-  // ⌘K / Ctrl+K to open
   React.useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
@@ -63,7 +57,7 @@ export function CommandPalette() {
   };
 
   return (
-    <CommandDialog open={open} onOpenChange={setOpen} className="max-w-xl">
+    <CommandDialog open={open} onOpenChange={setOpen}>
       <CommandInput placeholder="Search pages, leads, companies, actions…" />
       <CommandList className="max-h-[420px]">
         <CommandEmpty>No results found.</CommandEmpty>
@@ -78,7 +72,7 @@ export function CommandPalette() {
                 onSelect={() => go(item.id)}
                 className="text-[13px]"
               >
-                <Icon className="w-4 h-4 mr-2 text-muted-foreground" />
+                <Icon className="w-4 h-4 mr-2.5 text-muted-foreground" />
                 <span className="flex-1">{item.label}</span>
                 {item.shortcut && (
                   <kbd className="text-[10px] text-muted-foreground font-mono">
@@ -98,7 +92,7 @@ export function CommandPalette() {
             onSelect={() => go("leads")}
             className="text-[13px]"
           >
-            <Plus className="w-4 h-4 mr-2 text-muted-foreground" />
+            <Plus className="w-4 h-4 mr-2.5 text-muted-foreground" />
             Create new lead
           </CommandItem>
           <CommandItem
@@ -106,18 +100,18 @@ export function CommandPalette() {
             onSelect={() => go("companies")}
             className="text-[13px]"
           >
-            <Building2 className="w-4 h-4 mr-2 text-muted-foreground" />
+            <Building2 className="w-4 h-4 mr-2.5 text-muted-foreground" />
             Search companies
-            <ArrowRight className="w-3 h-3 ml-auto text-muted-foreground/60" />
+            <ArrowRight className="w-3.5 h-3.5 ml-auto text-muted-foreground/60" />
           </CommandItem>
           <CommandItem
             value="search leads"
             onSelect={() => go("leads")}
             className="text-[13px]"
           >
-            <Users2 className="w-4 h-4 mr-2 text-muted-foreground" />
+            <Users2 className="w-4 h-4 mr-2.5 text-muted-foreground" />
             Search leads
-            <ArrowRight className="w-3 h-3 ml-auto text-muted-foreground/60" />
+            <ArrowRight className="w-3.5 h-3.5 ml-auto text-muted-foreground/60" />
           </CommandItem>
         </CommandGroup>
 
@@ -129,7 +123,7 @@ export function CommandPalette() {
             onSelect={() => setTheme("dark")}
             className="text-[13px]"
           >
-            <Moon className="w-4 h-4 mr-2 text-muted-foreground" />
+            <Moon className="w-4 h-4 mr-2.5 text-muted-foreground" />
             Switch to dark theme
             {theme === "dark" && <span className="ml-auto text-[10px] text-muted-foreground">Active</span>}
           </CommandItem>
@@ -138,7 +132,7 @@ export function CommandPalette() {
             onSelect={() => setTheme("light")}
             className="text-[13px]"
           >
-            <Sun className="w-4 h-4 mr-2 text-muted-foreground" />
+            <Sun className="w-4 h-4 mr-2.5 text-muted-foreground" />
             Switch to light theme
             {theme === "light" && <span className="ml-auto text-[10px] text-muted-foreground">Active</span>}
           </CommandItem>
@@ -152,7 +146,7 @@ export function CommandPalette() {
             onSelect={() => go("settings")}
             className="text-[13px]"
           >
-            <Settings className="w-4 h-4 mr-2 text-muted-foreground" />
+            <Settings className="w-4 h-4 mr-2.5 text-muted-foreground" />
             Open settings
           </CommandItem>
         </CommandGroup>

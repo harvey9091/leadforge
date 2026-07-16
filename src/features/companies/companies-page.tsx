@@ -1,28 +1,30 @@
 "use client";
 
 /**
- * Companies page — Phase 2: real discovered companies.
+ * Companies page — premium redesign.
  *
  * Features:
  *  - Full-text search (name, domain, description, tags)
- *  - Filter by source, country, industry
+ *  - Filter by source, country, industry, status
  *  - Sort by discovered date, name, etc.
  *  - Grid view + table view
  *  - Pagination
+ *  - Add company dialog
  */
 
 import * as React from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { type ColumnDef, type SortingState } from "@tanstack/react-table";
-import { Plus, LayoutGrid, List, MoreHorizontal, MapPin, Calendar, Filter, Globe, Download, Search as SearchIcon, X } from "lucide-react";
+import { Plus, LayoutGrid, List, MapPin, Calendar, Filter, Globe, Download, Search as SearchIcon, X } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { DataTable, selectionColumn } from "@/components/data-table/data-table";
-import { GradeBadge, StatusBadge } from "@/components/common/status-badge";
+import { StatusBadge } from "@/components/common/status-badge";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Progress } from "@/components/ui/progress";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   Dialog,
   DialogContent,
@@ -39,8 +41,10 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { apiClient } from "@/lib/api-client";
-import { formatRelativeTime, cn } from "@/lib/utils";
+import { formatRelativeTime, formatDate, cn, initials } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
 interface Company {
@@ -61,6 +65,8 @@ interface Company {
   createdAt: string;
   sources: Array<{ type: string; url: string | null }>;
   tags: string[];
+  score?: number | null;
+  technologies?: string[];
 }
 
 interface Paginated<T> {
@@ -92,7 +98,9 @@ export function CompaniesPage() {
   const [sourceFilter, setSourceFilter] = React.useState<string | null>(null);
   const [countryFilter, setCountryFilter] = React.useState<string | null>(null);
   const [industryFilter, setIndustryFilter] = React.useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = React.useState<string | null>(null);
   const [selected, setSelected] = React.useState<string[]>([]);
+  const [addDialogOpen, setAddDialogOpen] = React.useState(false);
 
   const debouncedSearch = React.useDeferredValue(search);
 
@@ -117,20 +125,61 @@ export function CompaniesPage() {
     queryFn: () => apiClient.get<FilterOptions>("/companies/filters"),
   });
 
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const filteredData = React.useMemo(() => {
+    const currentData = data?.data;
+    if (!currentData) return [];
+    if (!statusFilter) return currentData;
+    return currentData.filter((c) => c.status === statusFilter);
+  }, [data?.data, statusFilter]);
+
+  const allStatuses = React.useMemo(() => {
+    const statuses = new Set<string>();
+    (data?.data ?? []).forEach((c) => { if (c.status) statuses.add(c.status); });
+    return Array.from(statuses).sort();
+  }, [data?.data]);
+
+  const addMutation = useMutation({
+    mutationFn: async (input: { name: string; website?: string; industry?: string; country?: string; description?: string }) => {
+      return apiClient.post<{ id: string }>("/companies", {
+        name: input.name,
+        website: input.website,
+        industry: input.industry,
+        country: input.country,
+        description: input.description,
+        source: "Manual",
+        tags: "",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["companies"] });
+      toast({ title: "Company added", description: "The company has been created." });
+      setAddDialogOpen(false);
+    },
+    onError: (err) => {
+      toast({ title: "Failed to add company", description: err instanceof Error ? err.message : "", variant: "destructive" });
+    },
+  });
+
   const columns: ColumnDef<Company>[] = React.useMemo(
     () => [
       selectionColumn<Company>(),
       {
         id: "name",
         header: "Company",
-        size: 240,
+        size: 260,
         cell: ({ row }) => {
           const c = row.original;
           return (
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-7 h-7 rounded-md bg-muted/60 flex items-center justify-center text-[10.5px] font-semibold text-foreground shrink-0">
-                {c.name.slice(0, 2).toUpperCase()}
-              </div>
+            <div className="flex items-center gap-3 min-w-0">
+              <Avatar className="h-8 w-8 rounded-md shrink-0">
+                {c.logoUrl && <AvatarImage src={c.logoUrl} alt={c.name} />}
+                <AvatarFallback className="rounded-md text-[11px] font-semibold bg-muted/60 text-foreground">
+                  {initials(c.name)}
+                </AvatarFallback>
+              </Avatar>
               <div className="min-w-0">
                 <div className="text-[13px] font-medium text-foreground truncate">{c.name}</div>
                 <div className="text-[11px] text-muted-foreground truncate">{c.domain ?? "—"}</div>
@@ -140,76 +189,71 @@ export function CompaniesPage() {
         },
       },
       {
+        id: "domain",
+        header: "Domain",
+        size: 160,
+        cell: ({ row }) => (
+          <span className="text-[12.5px] text-muted-foreground truncate block max-w-[160px]">{row.original.domain ?? "—"}</span>
+        ),
+      },
+      {
         id: "industry",
         header: "Industry",
-        size: 140,
+        size: 130,
         cell: ({ row }) => (
           <span className="text-[12.5px] text-muted-foreground">{row.original.industry ?? "—"}</span>
         ),
       },
       {
-        id: "country",
-        header: "Country",
-        size: 120,
-        cell: ({ row }) => (
-          <span className="text-[12px] text-muted-foreground flex items-center gap-1">
-            {row.original.country ? <><MapPin className="w-3 h-3" />{row.original.country}</> : "—"}
-          </span>
-        ),
-      },
-      {
-        id: "sources",
-        header: "Sources",
+        id: "score",
+        header: "Score",
         size: 120,
         cell: ({ row }) => {
-          const sources = row.original.sources ?? [];
-          if (sources.length === 0) return <span className="text-muted-foreground">—</span>;
+          const score = (row.original as any).score ?? (row.original as any).qualification?.score ?? null;
+          const numericScore = typeof score === "number" ? score : null;
+          return (
+            <div className="flex items-center gap-2.5 min-w-[100px]">
+              <Progress value={numericScore ?? 0} className="h-1.5 flex-1 bg-muted/60 [&_[data-slot=progress-indicator]]:bg-foreground/80" />
+              <span className="text-[11.5px] text-muted-foreground tabular-nums w-8 text-right">
+                {numericScore !== null ? `${Math.round(numericScore)}` : "—"}
+              </span>
+            </div>
+          );
+        },
+      },
+      {
+        id: "status",
+        header: "Status",
+        size: 120,
+        cell: ({ row }) => <StatusBadge status={row.original.status} />,
+      },
+      {
+        id: "technologies",
+        header: "Technologies",
+        size: 200,
+        cell: ({ row }) => {
+          const techs = row.original.technologies ?? row.original.tags ?? [];
+          if (!techs || techs.length === 0) return <span className="text-muted-foreground">—</span>;
           return (
             <div className="flex items-center gap-1 flex-wrap">
-              {sources.slice(0, 2).map((s, i) => (
-                <Badge key={i} variant="outline" className="text-[9.5px] py-0 h-4 font-normal">
-                  {SOURCE_LABELS[s.type] ?? s.type}
-                </Badge>
+              {techs.slice(0, 3).map((t: string, i: number) => (
+                <Badge key={i} variant="outline" className="text-[10px] font-normal h-5">{t}</Badge>
               ))}
-              {sources.length > 2 && (
-                <span className="text-[10px] text-muted-foreground">+{sources.length - 2}</span>
+              {techs.length > 3 && (
+                <span className="text-[10px] text-muted-foreground">+{techs.length - 3}</span>
               )}
             </div>
           );
         },
       },
       {
-        id: "fundingStage",
-        header: "Funding",
-        size: 100,
-        cell: ({ row }) => (
-          <span className="text-[12px] text-muted-foreground">{row.original.fundingStage ?? "—"}</span>
-        ),
-      },
-      {
-        id: "status",
-        header: "Status",
-        size: 110,
-        cell: ({ row }) => <StatusBadge status={row.original.status} />,
-      },
-      {
         id: "discoveredAt",
         header: "Discovered",
         size: 110,
         cell: ({ row }) => (
-          <span className="text-[12px] text-muted-foreground tabular-nums">
-            {formatRelativeTime(row.original.discoveredAt)}
+          <span className="text-[12.5px] text-muted-foreground tabular-nums">
+            {formatDate(row.original.discoveredAt, { month: "short", day: "numeric" })}
           </span>
-        ),
-      },
-      {
-        id: "actions",
-        header: "",
-        size: 40,
-        cell: () => (
-          <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100">
-            <MoreHorizontal className="w-3.5 h-3.5" />
-          </Button>
         ),
       },
     ],
@@ -220,7 +264,7 @@ export function CompaniesPage() {
     <div className="p-6 lg:p-8 max-w-[1400px] mx-auto">
       <PageHeader
         title="Companies"
-        description="Real discovered companies from all sources."
+        description="Every discovered company in the database."
         actions={
           <>
             <div className="flex items-center rounded-md border border-border p-0.5">
@@ -236,6 +280,30 @@ export function CompaniesPage() {
         }
       />
 
+      {/* Status filter chips */}
+      <div className="flex items-center gap-2 mb-5 flex-wrap">
+        {allStatuses.map((status) => (
+          <button
+            key={status}
+            onClick={() => setStatusFilter((prev) => (prev === status ? null : status))}
+            className={cn(
+              "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11.5px] font-medium transition-all duration-150",
+              statusFilter === status
+                ? "bg-foreground/10 text-foreground shadow-sm"
+                : "bg-muted/40 text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+            )}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />
+            {status.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())}
+          </button>
+        ))}
+        {statusFilter && (
+          <Button variant="ghost" size="sm" className="h-7 text-[11px]" onClick={() => setStatusFilter(null)}>
+            Clear
+          </Button>
+        )}
+      </div>
+
       {/* Advanced search bar */}
       <div className="flex items-center gap-2 mb-4">
         <div className="relative flex-1 max-w-md">
@@ -249,15 +317,12 @@ export function CompaniesPage() {
           {search && (
             <button
               onClick={() => setSearch("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
             >
               <X className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
-        {selected.length > 0 && (
-          <BulkActionsBar selectedIds={selected} onClear={() => setSelected([])} />
-        )}
       </div>
 
       {/* Filter bar */}
@@ -283,31 +348,34 @@ export function CompaniesPage() {
           options={filterOptions?.industries.map((i) => ({ value: i, label: i })) ?? []}
           onChange={(v) => { setIndustryFilter(v); setPage(1); }}
         />
-        {(sourceFilter || countryFilter || industryFilter) && (
+        {(sourceFilter || countryFilter || industryFilter || statusFilter) && (
           <Button
             variant="ghost"
             size="sm"
             className="h-7 text-[11px]"
-            onClick={() => { setSourceFilter(null); setCountryFilter(null); setIndustryFilter(null); setPage(1); }}
+            onClick={() => { setSourceFilter(null); setCountryFilter(null); setIndustryFilter(null); setStatusFilter(null); setPage(1); }}
           >
             Clear filters
           </Button>
         )}
       </div>
 
+      {selected.length > 0 && (
+        <div className="mb-4">
+          <BulkActionsBar selectedIds={selected} onClear={() => setSelected([])} />
+        </div>
+      )}
+
       {view === "table" ? (
         <DataTable
           columns={columns}
-          data={data?.data ?? []}
+          data={filteredData}
           loading={isLoading}
           page={page}
           pageSize={pageSize}
           total={data?.pagination.total ?? 0}
           onPageChange={setPage}
           onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
-          search={search}
-          onSearchChange={(v) => { setSearch(v); setPage(1); }}
-          searchPlaceholder="Search by name, domain, description…"
           sorting={sorting}
           onSortingChange={setSorting}
           enableSelection
@@ -324,11 +392,103 @@ export function CompaniesPage() {
           }}
           emptyTitle="No companies found"
           emptyDescription="No companies match your filters. Try adjusting your search or create a discovery job."
+          toolbarActions={
+            <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" className="gap-1.5 h-8">
+                  <Plus className="w-3.5 h-3.5" />
+                  Add Company
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="text-[15px]">Add Company</DialogTitle>
+                </DialogHeader>
+                <AddCompanyForm onSuccess={() => setAddDialogOpen(false)} />
+              </DialogContent>
+            </Dialog>
+          }
         />
       ) : (
         <CompanyGrid companies={data?.data ?? []} loading={isLoading} total={data?.pagination.total ?? 0} />
       )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Add Company Form
+// ---------------------------------------------------------------------------
+
+function AddCompanyForm({ onSuccess }: { onSuccess: () => void }) {
+  const [name, setName] = React.useState("");
+  const [website, setWebsite] = React.useState("");
+  const [industry, setIndustry] = React.useState("");
+  const [country, setCountry] = React.useState("");
+  const [description, setDescription] = React.useState("");
+  const { toast } = useToast();
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      return apiClient.post<{ id: string }>("/companies", {
+        name: name.trim(),
+        website: website.trim() || undefined,
+        industry: industry.trim() || undefined,
+        country: country.trim() || undefined,
+        description: description.trim() || undefined,
+        source: "Manual",
+        tags: "",
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "Company added", description: `${name} has been created.` });
+      onSuccess();
+    },
+    onError: (err) => {
+      toast({ title: "Failed to add company", description: err instanceof Error ? err.message : "", variant: "destructive" });
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) {
+      toast({ title: "Name required", description: "Please enter a company name.", variant: "destructive" });
+      return;
+    }
+    mutation.mutate();
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4 py-2">
+      <div className="space-y-1.5">
+        <Label className="text-[12px] font-medium">Name <span className="text-destructive">*</span></Label>
+        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Acme Inc." className="h-8 text-[13px]" />
+      </div>
+      <div className="space-y-1.5">
+        <Label className="text-[12px] font-medium">Website</Label>
+        <Input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://acme.com" className="h-8 text-[13px]" />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label className="text-[12px] font-medium">Industry</Label>
+          <Input value={industry} onChange={(e) => setIndustry(e.target.value)} placeholder="SaaS" className="h-8 text-[13px]" />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-[12px] font-medium">Country</Label>
+          <Input value={country} onChange={(e) => setCountry(e.target.value)} placeholder="USA" className="h-8 text-[13px]" />
+        </div>
+      </div>
+      <div className="space-y-1.5">
+        <Label className="text-[12px] font-medium">Description</Label>
+        <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Brief description…" className="text-[13px] min-h-[80px]" />
+      </div>
+      <DialogFooter>
+        <Button type="button" variant="outline" size="sm" onClick={onSuccess}>Cancel</Button>
+        <Button type="submit" size="sm" disabled={mutation.isPending}>
+          {mutation.isPending ? "Creating…" : "Create Company"}
+        </Button>
+      </DialogFooter>
+    </form>
   );
 }
 
@@ -350,7 +510,7 @@ function FilterDropdown({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className={cn("h-7 text-[11.5px] gap-1", value && "border-foreground")}>
+        <Button variant="outline" size="sm" className={cn("h-7 text-[11.5px] gap-1", value && "border-foreground/40")}>
           {label}{value && <span className="text-muted-foreground">: {value}</span>}
         </Button>
       </DropdownMenuTrigger>
@@ -458,6 +618,7 @@ function CompanyGrid({ companies, loading, total }: { companies: Company[]; load
 // ---------------------------------------------------------------------------
 // Export Dialog
 // ---------------------------------------------------------------------------
+
 function ExportDialog({ selectedIds, filters }: { selectedIds: string[]; filters: Record<string, unknown> }) {
   const { toast } = useToast();
   const [open, setOpen] = React.useState(false);
@@ -566,6 +727,7 @@ function ExportDialog({ selectedIds, filters }: { selectedIds: string[]; filters
 // ---------------------------------------------------------------------------
 // Bulk Actions Bar
 // ---------------------------------------------------------------------------
+
 function BulkActionsBar({ selectedIds, onClear }: { selectedIds: string[]; onClear: () => void }) {
   const { toast } = useToast();
   const [tagInput, setTagInput] = React.useState("");

@@ -52,14 +52,12 @@
 }
 
 /* ============================================================
-   Design Tokens — Dark-first premium palette
-   Inspired by Linear, Claude, Vercel — restrained, mature, intentional
+   Design Tokens — Premium Dark-First Palette
+   Inspired by Linear, Claude, Vercel — restrained and intentional
    ============================================================ */
 :root {
-  /* Base radius — slightly tighter than default for a sharper, modern feel */
   --radius: 0.625rem;
 
-  /* Light theme (secondary) — warm off-white */
   --background: oklch(0.985 0.002 240);
   --foreground: oklch(0.18 0.005 260);
   --card: oklch(1 0 0);
@@ -102,35 +100,20 @@
 
 /* Dark theme — the canonical, primary experience */
 .dark {
-  /* Background — near-black, very subtle cool undertone (zinc-950 inspired but warmer) */
   --background: oklch(0.14 0.004 264);
   --foreground: oklch(0.97 0.002 240);
-
-  /* Card — a whisper lighter than background, enough to separate */
   --card: oklch(0.17 0.005 264);
   --card-foreground: oklch(0.97 0.002 240);
-
-  /* Popover — same as card for consistency */
   --popover: oklch(0.17 0.005 264);
   --popover-foreground: oklch(0.97 0.002 240);
-
-  /* Primary — clean near-white for high-contrast actions */
   --primary: oklch(0.97 0.002 240);
   --primary-foreground: oklch(0.16 0.005 264);
-
-  /* Secondary — for muted interactive elements */
   --secondary: oklch(0.21 0.005 264);
   --secondary-foreground: oklch(0.97 0.002 240);
-
-  /* Muted — backgrounds for hover, skeletons */
   --muted: oklch(0.21 0.005 264);
   --muted-foreground: oklch(0.62 0.008 264);
-
-  /* Accent — subtle glass highlight */
   --accent: oklch(0.23 0.006 264);
   --accent-foreground: oklch(0.97 0.002 240);
-
-  /* Status colors — desaturated, premium, not neon */
   --destructive: oklch(0.62 0.18 25);
   --destructive-foreground: oklch(0.98 0 0);
   --success: oklch(0.7 0.13 160);
@@ -139,20 +122,14 @@
   --warning-foreground: oklch(0.14 0.004 264);
   --info: oklch(0.68 0.1 220);
   --info-foreground: oklch(0.14 0.004 264);
-
-  /* Border — almost invisible, just enough to define edges */
   --border: oklch(1 0 0 / 7%);
   --input: oklch(1 0 0 / 12%);
   --ring: oklch(0.55 0.008 264);
-
-  /* Chart palette — muted, complementary */
   --chart-1: oklch(0.7 0.13 160);
   --chart-2: oklch(0.72 0.14 75);
   --chart-3: oklch(0.62 0.18 25);
   --chart-4: oklch(0.68 0.1 220);
   --chart-5: oklch(0.6 0.12 290);
-
-  /* Sidebar — slightly darker than main bg for depth */
   --sidebar: oklch(0.12 0.004 264);
   --sidebar-foreground: oklch(0.97 0.002 240);
   --sidebar-primary: oklch(0.97 0.002 240);

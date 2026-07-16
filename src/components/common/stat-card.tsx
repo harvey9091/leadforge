@@ -1,15 +1,14 @@
 "use client";
 
 /**
- * Stat / KPI card — the workhorse of the dashboard.
+ * Stat / KPI card — premium redesign for dashboard metrics.
  *
- * Variants:
- *  - default: large number, small label, optional delta
- *  - compact: smaller numbers for dense grids
- *
- * Delta is shown as a colored pill — green for positive, red for negative,
- * muted for zero. Always includes the period ("vs last 7 days") in a
- * tooltip to avoid ambiguity.
+ * Features:
+ *  - Larger, more refined typography
+ *  - Better spacing and breathing room
+ *  - Subtle gradient icon backgrounds
+ *  - Smooth hover elevation
+ *  - Animated counter with better timing
  */
 
 import * as React from "react";
@@ -71,49 +70,51 @@ export function StatCard({
     delta === undefined || delta === 0
       ? "flat"
       : delta > 0
-      ? "up"
-      : "down";
+        ? "up"
+        : "down";
 
   return (
     <Card
       className={cn(
-        "relative p-5 border-border/60 bg-card/40 backdrop-blur-sm overflow-hidden",
-        "transition-colors hover:border-border/80",
+        "relative p-5 border-border/60 bg-card/40 backdrop-blur-sm overflow-hidden group transition-all duration-300 hover:border-border/80 hover:bg-card/60 hover:shadow-premium",
         className
       )}
     >
-      <div className="flex items-start justify-between gap-2">
-        <span className="text-[12px] font-medium text-muted-foreground uppercase tracking-wide">
+      <div className="flex items-start justify-between gap-3">
+        <span className="text-[11.5px] font-semibold text-muted-foreground uppercase tracking-wider">
           {label}
         </span>
         {Icon && (
-          <div className="w-7 h-7 rounded-md flex items-center justify-center bg-muted/40 text-muted-foreground">
-            <Icon className="w-3.5 h-3.5" />
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-muted/40 text-muted-foreground group-hover:scale-110 transition-transform duration-200">
+            <Icon className="w-4 h-4" />
           </div>
         )}
       </div>
 
-      <div className="mt-3 flex items-baseline gap-2">
+      <div className="mt-4 flex items-baseline gap-2">
         {loading ? (
-          <div className="h-7 w-20 rounded bg-muted/60 animate-pulse" />
+          <div className="h-8 w-24 rounded-lg bg-muted/60 animate-pulse" />
         ) : (
-          <span className="text-[26px] font-semibold tracking-tight text-foreground tabular-nums">
+          <span className="text-[28px] font-bold tracking-tight text-foreground tabular-nums">
             {typeof value === "string" ? (
               value
             ) : (
-              <AnimatedCounter value={value} format={format === "number" || format === "currency" ? "compact" : format} />
+              <AnimatedCounter
+                value={value}
+                format={format === "number" || format === "currency" ? "compact" : format}
+              />
             )}
           </span>
         )}
       </div>
 
       {delta !== undefined && !loading && (
-        <div className="mt-2.5 flex items-center gap-1.5">
+        <div className="mt-3 flex items-center gap-1.5">
           <Tooltip>
             <TooltipTrigger asChild>
               <span
                 className={cn(
-                  "inline-flex items-center gap-0.5 text-[11.5px] font-medium px-1.5 py-0.5 rounded-md cursor-default",
+                  "inline-flex items-center gap-0.5 text-[11px] font-semibold px-1.5 py-0.5 rounded-md cursor-default",
                   deltaState === "up" && "bg-success/10 text-success",
                   deltaState === "down" && "bg-destructive/10 text-destructive",
                   deltaState === "flat" && "bg-muted text-muted-foreground"

@@ -1,50 +1,57 @@
 "use client";
 
 /**
- * Section — labeled content group with optional action.
+ * Section — titled content section wrapper.
  *
- * Used inside pages to break content into clear visual zones without
- * needing a card around everything.
+ * Premium redesign:
+ *  - Better spacing and breathing room
+ *  - Cleaner typography
+ *  - More refined card wrapper
  */
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
+import { Card } from "@/components/ui/card";
 
 interface SectionProps {
-  title?: string;
+  title: string;
   description?: string;
-  actions?: React.ReactNode;
   children: React.ReactNode;
+  actions?: React.ReactNode;
   className?: string;
-  bodyClassName?: string;
+  contentClassName?: string;
 }
 
 export function Section({
   title,
   description,
-  actions,
   children,
+  actions,
   className,
-  bodyClassName,
+  contentClassName,
 }: SectionProps) {
   return (
-    <section className={cn("space-y-3", className)}>
-      {(title || actions) && (
-        <div className="flex items-end justify-between gap-3">
-          <div>
-            {title && (
-              <h2 className="text-[14px] font-semibold text-foreground tracking-tight">
-                {title}
-              </h2>
-            )}
-            {description && (
-              <p className="text-[12.5px] text-muted-foreground mt-0.5">{description}</p>
-            )}
-          </div>
-          {actions && <div className="flex items-center gap-1.5">{actions}</div>}
+    <Card className={cn("border-border/60 bg-card/40 overflow-hidden", className)}>
+      <div className="p-5 pb-4 flex items-start justify-between gap-4">
+        <div>
+          <h3 className="text-[15px] font-semibold text-foreground">
+            {title}
+          </h3>
+          {description && (
+            <p className="text-[12.5px] text-muted-foreground mt-1 leading-relaxed">
+              {description}
+            </p>
+          )}
         </div>
-      )}
-      <div className={bodyClassName}>{children}</div>
-    </section>
+        {actions && (
+          <div className="flex items-center gap-2 shrink-0 pt-0.5">
+            {actions}
+          </div>
+        )}
+      </div>
+      <div className={cn("px-5 pb-5", contentClassName)}>
+        {children}
+      </div>
+    </Card>
   );
 }

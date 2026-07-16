@@ -33,8 +33,6 @@ export type RouteId =
   | "settings.appearance"
   | "settings.api-keys"
   | "settings.integrations"
-  | "settings.infrastructure"
-  | "settings.freellm"
   | "settings.workers"
   | "settings.system"
   | "404";
@@ -225,22 +223,6 @@ export const ROUTES: Record<RouteId, RouteMeta> = {
     path: "/settings/integrations",
     title: "Integrations — Leadforge",
     description: "Connect external services.",
-    protected: true,
-    shell: true,
-  },
-  "settings.infrastructure": {
-    id: "settings.infrastructure",
-    path: "/settings/infrastructure",
-    title: "Infrastructure — Leadforge",
-    description: "Manage external service connections and health.",
-    protected: true,
-    shell: true,
-  },
-  "settings.freellm": {
-    id: "settings.freellm",
-    path: "/settings/freellm",
-    title: "FreeLLM API — Leadforge",
-    description: "Configure the FreeLLM gateway for AI qualification.",
     protected: true,
     shell: true,
   },

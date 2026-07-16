@@ -3,9 +3,11 @@
 /**
  * Login page — email + password sign-in.
  *
- * Uses React Hook Form + Zod for client-side validation matching the
- * server schema. On submit, calls the auth context's signIn method.
- * On success, navigates to /dashboard.
+ * Premium redesign:
+ *  - Better form spacing
+ *  - Refined input styling
+ *  - Better error states
+ *  - Premium button with hover effects
  */
 
 import * as React from "react";
@@ -51,7 +53,13 @@ export function LoginPage() {
 
   return (
     <AuthLayout title="Sign in to your workspace" description="Enter your credentials to continue.">
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <motion.form
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.1 }}
+        onSubmit={form.handleSubmit(onSubmit)}
+        className="space-y-5"
+      >
         <div className="space-y-1.5">
           <Label htmlFor="email" className="text-[12.5px] font-medium">
             Email
@@ -119,7 +127,7 @@ export function LoginPage() {
           {submitting ? "Signing in…" : "Sign in"}
           {!submitting && <ArrowRight className="w-4 h-4" />}
         </Button>
-      </form>
+      </motion.form>
 
       <motion.div
         initial={{ opacity: 0 }}

@@ -1,13 +1,15 @@
 "use client";
 
 /**
- * Settings section wrapper — provides the consistent card layout used by
- * every settings sub-page. Includes title, description, and a content slot.
+ * Settings section wrapper — premium redesign.
+ *
+ * Cleaner card layout with better spacing and typography.
  */
 
 import * as React from "react";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { Separator } from "@/components/ui/separator";
 
 interface SettingsSectionProps {
   title: string;
@@ -20,14 +22,19 @@ interface SettingsSectionProps {
 export function SettingsSection({ title, description, children, className, footer }: SettingsSectionProps) {
   return (
     <Card className={cn("border-border/60 bg-card/40 overflow-hidden", className)}>
-      <div className="p-5 border-b border-border/60">
-        <h2 className="text-[14px] font-semibold text-foreground">{title}</h2>
+      <div className="p-5 pb-4">
+        <h2 className="text-[15px] font-semibold text-foreground">{title}</h2>
         {description && (
-          <p className="text-[12.5px] text-muted-foreground mt-0.5 leading-relaxed">{description}</p>
+          <p className="text-[12.5px] text-muted-foreground mt-1 leading-relaxed">{description}</p>
         )}
       </div>
+      <Separator className="bg-border/40" />
       <div className="p-5">{children}</div>
-      {footer && <div className="px-5 py-3 border-t border-border/60 bg-muted/20">{footer}</div>}
+      {footer && (
+        <div className="px-5 py-3 border-t border-border/40 bg-muted/20">
+          {footer}
+        </div>
+      )}
     </Card>
   );
 }
@@ -42,7 +49,7 @@ export function SettingsRow({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-start justify-between gap-6 py-3 first:pt-0 last:pb-0">
+    <div className="flex items-start justify-between gap-6 py-3.5 first:pt-0 last:pb-0">
       <div className="flex-1 min-w-0">
         <div className="text-[13px] font-medium text-foreground">{label}</div>
         {description && (

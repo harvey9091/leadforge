@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Dashboard page — real discovery data from the database.
+ * Dashboard page — premium redesign with refined metrics.
  */
 
 import * as React from "react";
@@ -16,10 +16,10 @@ import {
   Loader2,
   Compass,
   Sparkles,
+  TrendingUp,
 } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { StatCard } from "@/components/common/stat-card";
-import { Section } from "@/components/common/section";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -120,7 +120,7 @@ export function DashboardPage() {
         title="Dashboard"
         description="Real-time discovery metrics from your lead pipeline."
         actions={
-          <Button variant="outline" size="sm" className="gap-1.5" asChild>
+          <Button variant="outline" size="sm" className="gap-1.5 border-border/60" asChild>
             <a href={routeHref("discover")}>
               <Compass className="w-3.5 h-3.5" />
               New discovery
@@ -151,7 +151,7 @@ export function DashboardPage() {
               </Button>
             </div>
             {isLoading ? (
-              <Skeleton className="h-[240px] w-full" />
+              <Skeleton className="h-[240px] w-full rounded-lg" />
             ) : sourceData.length === 0 ? (
               <div className="h-[240px] flex items-center justify-center text-[13px] text-muted-foreground">No data yet — run a discovery job to see metrics</div>
             ) : (

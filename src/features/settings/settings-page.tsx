@@ -3,9 +3,10 @@
 /**
  * Settings page — wraps a sub-navigation layout with multiple sections.
  *
- * Each section is a self-contained component. Sections that depend on
- * Phase 2 functionality render clean placeholders documenting what's
- * planned.
+ * Premium redesign:
+ *  - Cleaner sub-navigation with better spacing
+ *  - Better visual hierarchy
+ *  - More refined card layout
  */
 
 import * as React from "react";
@@ -19,10 +20,8 @@ import { ProfileSection } from "@/features/settings/sections/profile";
 import { AppearanceSection } from "@/features/settings/sections/appearance";
 import { ApiKeysSection } from "@/features/settings/sections/api-keys";
 import { IntegrationsSection } from "@/features/settings/sections/integrations";
-import { InfrastructureSection } from "@/features/settings/sections/infrastructure";
 import { WorkersSection } from "@/features/settings/sections/workers";
 import { SystemSection } from "@/features/settings/sections/system";
-import { FreeLLMSection } from "@/features/settings/sections/freellm";
 
 export function SettingsPage() {
   const route = useHashRoute();
@@ -46,16 +45,16 @@ export function SettingsPage() {
                 key={item.id}
                 href={routeHref(item.id)}
                 className={cn(
-                  "flex items-center gap-2.5 h-9 px-2.5 rounded-md text-[13px] font-medium transition-colors",
+                  "flex items-center gap-2.5 h-9 px-2.5 rounded-lg text-[13px] font-medium transition-all duration-200",
                   active
-                    ? "bg-muted text-foreground"
+                    ? "bg-muted text-foreground shadow-sm"
                     : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
                 )}
               >
                 <Icon className="w-4 h-4" />
                 <span className="flex-1">{item.label}</span>
                 {item.soon && (
-                  <span className="text-[9px] uppercase font-semibold tracking-wide text-muted-foreground/60">
+                  <span className="text-[9px] uppercase font-bold tracking-wider text-muted-foreground/50">
                     Soon
                   </span>
                 )}
@@ -65,14 +64,12 @@ export function SettingsPage() {
         </nav>
 
         {/* Section content */}
-        <div className="min-w-0">
+        <div className="min-w-0 space-y-4">
           {activeId === "settings.general" && <GeneralSection />}
           {activeId === "settings.profile" && <ProfileSection />}
           {activeId === "settings.appearance" && <AppearanceSection />}
           {activeId === "settings.api-keys" && <ApiKeysSection />}
           {activeId === "settings.integrations" && <IntegrationsSection />}
-          {activeId === "settings.infrastructure" && <InfrastructureSection />}
-          {activeId === "settings.freellm" && <FreeLLMSection />}
           {activeId === "settings.workers" && <WorkersSection />}
           {activeId === "settings.system" && <SystemSection />}
           {(activeId === "settings" || !activeId.startsWith("settings.")) && <GeneralSection />}
