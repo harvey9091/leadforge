@@ -248,21 +248,36 @@ async function processJob(jobId: string): Promise<void> {
   // Build the discovery context (callbacks for source adapters)
   const ctx: DiscoveryContext = {
     jobId,
+    workerId: getWorkerId(),
     shouldContinue: () => isJobActive(jobId),
-    log: (level, message, metadata) => {
-      void discoveryLogRepository.create({
-        jobId,
-        level: level.toUpperCase() as "DEBUG" | "INFO" | "WARN" | "ERROR",
-        message,
-        metadata,
-      });
+    log: async (level, message, metadata) => {
+      try {
+        await discoveryLogRepository.create({
+          jobId,
+          level: level.toUpperCase() as "DEBUG" | "INFO" | "WARN" | "ERROR",
+          message,
+          metadata,
+        });
+      } catch (err) {
+        logger.error("discovery.worker.logError", {
+          jobId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
     },
-    updateProgress: (update) => {
+    updateProgress: async (update) => {
       Object.assign(progress, update);
-      void discoveryJobRepository.updateProgress(jobId, {
-        ...progress,
-        lastHeartbeat: new Date(),
-      });
+      try {
+        await discoveryJobRepository.updateProgress(jobId, {
+          ...progress,
+          lastHeartbeat: new Date(),
+        });
+      } catch (err) {
+        logger.error("discovery.worker.progressError", {
+          jobId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
     },
     sleep: async (ms) => {
       const end = Date.now() + ms;
@@ -318,20 +333,17 @@ async function processJob(jobId: string): Promise<void> {
           // 2. Validate
           const validation = validate(normalized);
           if (!validation.valid) {
-            await discoveryLogRepository.create({
-              jobId,
-              level: "DEBUG",
+            await ctx.log("debug", `Rejected company: ${normalized.name || "unknown"} — ${validation.reason}`, {
+              reasonCode: validation.reasonCode,
+              domain: normalized.domain,
               source: source.id,
-              message: `Rejected company: ${normalized.name || "unknown"} — ${validation.reason}`,
-              metadata: { reasonCode: validation.reasonCode, domain: normalized.domain },
             });
-            progress.errorsCount = ++totalErrors;
+            totalErrors++;
+            progress.errorsCount = totalErrors;
             continue;
           }
 
-          // 3. Dedup — check against DB + this job's batch
-          batchDomains.push(normalized.domain!);
-          batchNames.push(normalized.name);
+          // 3. Dedup — check against DB
           const existing = await companyRepository.findForDedup(
             [normalized.domain!, normalized.apexDomain!].filter(Boolean),
             [normalized.name]
@@ -353,12 +365,10 @@ async function processJob(jobId: string): Promise<void> {
               discoveryJobId: jobId,
             });
 
-            await discoveryLogRepository.create({
-              jobId,
-              level: "INFO",
-              source: source.id,
-              message: `Duplicate merged: ${normalized.name} → existing company`,
-              metadata: { matchStrategy: dupResult.matchStrategy, confidence: dupResult.confidence },
+            await ctx.log("info", `Duplicate merged: ${normalized.name} → existing company`, {
+              matchStrategy: dupResult.matchStrategy,
+              confidence: dupResult.confidence,
+              existingCompanyId: dupResult.existingCompanyId,
             });
 
             // Record merge history
@@ -386,38 +396,46 @@ async function processJob(jobId: string): Promise<void> {
             });
           } else {
             // 4. Store new company
-            const companyId = await companyRepository.create(normalized);
-            const sourceConfidence = getSourceConfidence(normalized.source);
-            await companyRepository.addSource(companyId, {
-              type: normalized.source,
-              externalId: normalized.sourceExternalId,
-              url: normalized.sourceUrl,
-              rawPayload: normalized.raw,
-              discoveryJobId: jobId,
-              confidence: sourceConfidence,
-            });
+            try {
+              const companyId = await companyRepository.create(normalized);
+              const sourceConfidence = getSourceConfidence(normalized.source);
+              await companyRepository.addSource(companyId, {
+                type: normalized.source,
+                externalId: normalized.sourceExternalId,
+                url: normalized.sourceUrl,
+                rawPayload: normalized.raw,
+                discoveryJobId: jobId,
+                confidence: sourceConfidence,
+              });
 
-            totalStored++;
-            progress.companiesStored = totalStored;
+              totalStored++;
+              progress.companiesStored = totalStored;
 
-            await discoveryLogRepository.create({
-              jobId,
-              level: "INFO",
-              source: source.id,
-              message: `Stored company: ${normalized.name} (${normalized.domain})`,
-              metadata: { companyId },
-            });
+              await ctx.log("info", `Stored company: ${normalized.name} (${normalized.domain})`, {
+                companyId,
+                source: source.id,
+              });
 
-            // Emit CompanyDiscovered event
-            await eventBus.emit("CompanyDiscovered", {
-              companyId,
-              jobId,
-              source: normalized.source,
-              name: normalized.name,
-              domain: normalized.domain,
-              confidence: sourceConfidence,
-              timestamp: new Date(),
-            });
+              // Emit CompanyDiscovered event
+              await eventBus.emit("CompanyDiscovered", {
+                companyId,
+                jobId,
+                source: normalized.source,
+                name: normalized.name,
+                domain: normalized.domain,
+                confidence: sourceConfidence,
+                timestamp: new Date(),
+              });
+            } catch (storeErr) {
+              totalErrors++;
+              progress.errorsCount = totalErrors;
+              const storeErrorMsg = storeErr instanceof Error ? storeErr.message : String(storeErr);
+              await ctx.log("error", `DB insert failed: ${normalized.name} — ${storeErrorMsg}`, {
+                source: source.id,
+                domain: normalized.domain,
+                stack: storeErr instanceof Error ? storeErr.stack : undefined,
+              });
+            }
           }
 
           // Update heartbeat every 5 companies
@@ -436,11 +454,7 @@ async function processJob(jobId: string): Promise<void> {
 
           // Check max companies limit
           if (totalStored >= params.maxCompanies) {
-            await discoveryLogRepository.create({
-              jobId,
-              level: "INFO",
-              message: `Reached max companies limit (${params.maxCompanies}) — stopping`,
-            });
+            await ctx.log("info", `Reached max companies limit (${params.maxCompanies}) — stopping`);
             break;
           }
         }
@@ -478,10 +492,12 @@ async function processJob(jobId: string): Promise<void> {
       errorsCount: totalErrors,
     });
 
-    await discoveryLogRepository.create({
-      jobId,
-      level: "INFO",
-      message: `Job completed — ${totalFound} found, ${totalStored} stored, ${totalDuplicates} duplicates, ${totalErrors} errors`,
+    await ctx.log("info", `Job completed — ${totalFound} found, ${totalStored} stored, ${totalDuplicates} duplicates, ${totalErrors} errors`, {
+      totalFound,
+      totalStored,
+      totalDuplicates,
+      totalErrors,
+      sources: sourceIds,
     });
 
     // Add timeline entry
@@ -501,12 +517,30 @@ async function processJob(jobId: string): Promise<void> {
     });
 
     logger.info("discovery.worker.jobComplete", {
-      jobId, totalFound, totalStored, totalDuplicates, totalErrors,
+      jobId,
+      workerId: getWorkerId(),
+      name: job.name,
+      sources: sourceIds,
+      totalFound,
+      totalStored,
+      totalDuplicates,
+      totalErrors,
+      durationMs: job.startedAt ? Date.now() - job.startedAt.getTime() : 0,
     });
   } catch (err) {
     totalErrors++;
     const errorMsg = err instanceof Error ? err.message : String(err);
-    logger.error("discovery.worker.jobError", { jobId, error: errorMsg });
+    logger.error("discovery.worker.jobError", {
+      jobId,
+      workerId: getWorkerId(),
+      name: job.name,
+      error: errorMsg,
+      stack: err instanceof Error ? err.stack : undefined,
+      totalFound,
+      totalStored,
+      totalDuplicates,
+      totalErrors,
+    });
 
     await discoveryJobRepository.setStatus(jobId, "FAILED", {
       completedAt: new Date(),
@@ -517,8 +551,16 @@ async function processJob(jobId: string): Promise<void> {
     await discoveryLogRepository.create({
       jobId,
       level: "ERROR",
+      source: progress.currentSource,
       message: `Job failed: ${errorMsg}`,
-      metadata: { stack: err instanceof Error ? err.stack : undefined },
+      metadata: {
+        stack: err instanceof Error ? err.stack : undefined,
+        totalFound,
+        totalStored,
+        totalDuplicates,
+        totalErrors,
+        workerId: getWorkerId(),
+      },
     });
 
     // Emit DiscoveryFailed event

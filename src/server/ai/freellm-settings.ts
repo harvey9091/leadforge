@@ -74,14 +74,33 @@ async function loadFromIntegrationManager(): Promise<{
     if (!integration) return null;
     const config = await integration.loadConfiguration();
     if (!config || (!config.baseUrl && !config.apiKey)) return null;
+
+    let apiKey = config.apiKey;
+    let model = "auto";
+    let temperature = 0.3;
+    let maxTokens = 4000;
+    let streaming = false;
+    try {
+      const legacyRow = await db.freeLLMConfig.findUnique({ where: { id: "singleton" } });
+      if (legacyRow) {
+        model = legacyRow.model === "default" ? "auto" : legacyRow.model;
+        temperature = legacyRow.temperature;
+        maxTokens = legacyRow.maxTokens;
+        streaming = legacyRow.streaming;
+        apiKey = decryptApiKey(legacyRow.apiKeyEnc);
+      }
+    } catch {
+      // legacy table may not exist yet
+    }
+
     return {
       baseUrl: config.baseUrl,
-      apiKey: config.apiKey,
-      model: "auto",
-      temperature: 0.3,
-      maxTokens: 4000,
+      apiKey,
+      model,
+      temperature,
+      maxTokens,
       timeout: config.timeout,
-      streaming: false,
+      streaming,
     };
   } catch {
     return null;

@@ -56,7 +56,7 @@ describe("validator", () => {
     expect(result.reasonCode).toBe("spam");
   });
 
-  it("rejects empty companies (no useful data beyond name+domain)", () => {
+  it("accepts company with just name+domain (Show HN-style)", () => {
     const result = validate(normalize(makeRaw({
       description: "short",
       country: undefined,
@@ -64,8 +64,7 @@ describe("validator", () => {
       foundedYear: undefined,
       tags: [],
     })));
-    expect(result.valid).toBe(false);
-    expect(result.reasonCode).toBe("incomplete");
+    expect(result.valid).toBe(true);
   });
 
   it("accepts company with description as useful data", () => {

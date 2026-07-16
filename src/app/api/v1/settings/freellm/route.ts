@@ -19,26 +19,8 @@ export const runtime = "nodejs";
 
 export async function GET() {
   try {
-    const integration = integrationManager.get("freellm");
-    if (integration) {
-      const config = await integration.loadConfiguration();
-      if (config) {
-        return apiSuccess({
-          configured: !!(config.baseUrl && config.apiKey),
-          baseUrl: config.baseUrl,
-          model: "auto",
-          temperature: 0.3,
-          maxTokens: 4000,
-          timeout: config.timeout,
-          streaming: false,
-          apiKeySet: !!config.apiKey,
-          updatedAt: config.updatedAt,
-        });
-      }
-    }
-
-    const cfg = await loadFreeLLMConfig();
     const row = await db.freeLLMConfig.findUnique({ where: { id: "singleton" } });
+    const cfg = await loadFreeLLMConfig();
 
     return apiSuccess({
       configured: !!(cfg.baseUrl && cfg.apiKey),
@@ -90,29 +72,19 @@ export async function POST(req: Request) {
         maxRetries: 3,
         updatedAt: new Date().toISOString(),
       });
-    } else {
-      const newEncryptedKey = apiKey ? encryptApiKey(apiKey) : "";
-      const existing = await db.freeLLMConfig.findUnique({ where: { id: "singleton" } });
-
-      if (!baseUrl && !apiKey && existing) {
-        await clearFreeLLMConfig();
-        return apiSuccess({ ok: true, message: "FreeLLM config cleared" }, { requestId: ctx.requestId });
-      }
-
-      const finalKey = apiKey
-        ? newEncryptedKey
-        : existing?.apiKeyEnc ?? "";
-
-      await saveFreeLLMConfig({
-        baseUrl,
-        apiKey: apiKey || (existing ? decryptApiKey(existing.apiKeyEnc) : ""),
-        model: model === "default" ? "auto" : model,
-        temperature,
-        maxTokens,
-        timeout,
-        streaming,
-      });
     }
+
+    const existingRow = await db.freeLLMConfig.findUnique({ where: { id: "singleton" } });
+
+    await saveFreeLLMConfig({
+      baseUrl,
+      apiKey: apiKey || (existingRow ? decryptApiKey(existingRow.apiKeyEnc) : ""),
+      model: model === "default" ? "auto" : model,
+      temperature,
+      maxTokens,
+      timeout,
+      streaming,
+    });
 
     return apiSuccess(
       { ok: true, message: "FreeLLM configuration saved" },

@@ -101,9 +101,8 @@ export const hackerNewsSource: DiscoverySource = {
       });
 
       if (!result.ok) {
-        ctx.log("error", `HN API request failed: ${result.error}`, { status: result.status, page });
-        ctx.updateProgress({ errorsCount: 1 });
-        // Don't abort the whole job — try next page after a longer delay
+        await ctx.log("error", `HN API request failed: ${result.error}`, { status: result.status, page });
+        await ctx.updateProgress({ currentSource: this.label });
         await ctx.sleep(2000);
         page++;
         continue;

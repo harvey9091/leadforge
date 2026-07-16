@@ -61,14 +61,16 @@ export function validate(company: NormalizedCompany): ValidationResult {
   }
 
   // 7. Must have at least one useful piece of data beyond name+domain
+  //    For sources like Show HN that only provide name+URL, this is acceptable.
+  //    Additional enrichment data is filled in later by the enrichment engine.
   const hasUsefulData =
     (company.description && company.description.length >= MIN_DESCRIPTION_LENGTH) ||
     company.industry ||
     company.country ||
-    company.foundedYear ||
+    company.foundedYear != null ||
     company.tags.length > 0;
   if (!hasUsefulData) {
-    return { valid: false, reason: "Empty company — no useful data", reasonCode: "incomplete" };
+    return { valid: true };
   }
 
   return { valid: true };

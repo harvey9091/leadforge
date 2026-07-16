@@ -239,6 +239,7 @@ export const FreeLLMIntegration: IIntegration = {
   async loadConfiguration(): Promise<IntegrationConfig | null> {
     try {
       const { loadIntegrationConfig } = await import("@/server/repositories/integration.repository");
+      const { decryptApiKey } = await import("@/server/ai/freellm-settings");
       const row = await loadIntegrationConfig(ID);
       if (!row) return null;
       return {
@@ -247,7 +248,7 @@ export const FreeLLMIntegration: IIntegration = {
         description: this.description,
         icon: "sparkles",
         baseUrl: row.baseUrl,
-        apiKey: row.apiKeyEnc,
+        apiKey: decryptApiKey(row.apiKeyEnc),
         enabled: row.enabled,
         timeout: row.timeout,
         maxRetries: row.maxRetries,

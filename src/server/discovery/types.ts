@@ -140,12 +140,13 @@ export interface DiscoveryParams {
  */
 export interface DiscoveryContext {
   jobId: string;
+  workerId: string;
   /** Called after each company is yielded — return false to stop */
   shouldContinue: () => boolean;
   /** Log a message to the job's log */
-  log: (level: "debug" | "info" | "warn" | "error", message: string, metadata?: Record<string, unknown>) => void;
+  log: (level: "debug" | "info" | "warn" | "error", message: string, metadata?: Record<string, unknown>) => Promise<void>;
   /** Update progress on the job */
-  updateProgress: (progress: Partial<DiscoveryProgress>) => void;
+  updateProgress: (progress: Partial<DiscoveryProgress>) => Promise<void>;
   /** Sleep that respects cancellation (use instead of setTimeout) */
   sleep: (ms: number) => Promise<void>;
 }
