@@ -15,7 +15,7 @@
  */
 
 import { logger } from "@/server/utils/logger";
-import type { IIntegration, IntegrationHealth, IntegrationConfig, IntegrationTestResult } from "./base";
+import type { IIntegration, IntegrationHealth, IntegrationConfig, IntegrationTestResult, DiscoveredModel } from "./base";
 
 type HealthCacheEntry = {
   health: IntegrationHealth;
@@ -198,6 +198,27 @@ class IntegrationManager {
 
   clearCache(): void {
     this.healthCache.clear();
+  }
+
+  async discoverModels(id: string, overrides?: Partial<IntegrationConfig>): Promise<DiscoveredModel[]> {
+    const integration = this.integrations.get(id);
+    if (!integration) {
+      return [];
+    }
+
+    if (!integration.discoverModels) {
+      return [];
+    }
+
+    try {
+      return await integration.discoverModels(overrides);
+    } catch (err) {
+      logger.warn("integrations.discoverModels.failed", {
+        id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return [];
+    }
   }
 }
 

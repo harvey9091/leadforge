@@ -79,7 +79,7 @@ export const env = {
   freellm: {
     baseUrl: required("FREELLM_BASE_URL", ""),
     apiKey: required("FREELLM_API_KEY", ""),
-    model: required("FREELLM_MODEL", "default"),
+    model: required("FREELLM_MODEL", "auto"),
   },
 
   firecrawl: {

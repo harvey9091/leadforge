@@ -5,24 +5,44 @@
  *
  * Connects to a FreeLLM-compatible LLM gateway (OpenAI-compatible API).
  * Supports model discovery, connection testing, and configuration.
+ *
+ * Model handling:
+ *  - The UI label "Auto (server default)" maps to the API value "auto".
+ *  - Never sends "default" — the server rejects it.
+ *  - Discovered models are fetched dynamically from GET {baseUrl}/v1/models.
  * =============================================================================
  */
 
+import { fetchWithRetry } from "@/server/discovery/http-client";
 import { logger } from "@/server/utils/logger";
-import type { IIntegration, IntegrationHealth, IntegrationConfig, IntegrationTestResult } from "./base";
+import {
+  classifyHttpError,
+  classifyNetworkError,
+} from "@/server/integrations/diagnostics";
+import type {
+  IIntegration,
+  IntegrationHealth,
+  IntegrationConfig,
+  IntegrationTestResult,
+  DiscoveredModel,
+} from "./base";
 
 const ID = "freellm";
+
+const capabilities = {
+  healthCheck: true,
+  testConnection: true,
+  modelsList: true,
+  requiresAuth: true,
+  discoverModelsPath: "/v1/models",
+  metrics: ["latencyMs", "model", "tokenUsage"],
+} as const;
 
 export const FreeLLMIntegration: IIntegration = {
   id: ID,
   name: "FreeLLM",
   description: "LLM gateway for AI qualification and ICP analysis.",
-  capabilities: {
-    healthCheck: true,
-    testConnection: true,
-    modelsList: true,
-    metrics: ["latencyMs", "model", "tokenUsage"],
-  },
+  capabilities,
 
   getDefaultConfig(): IntegrationConfig {
     return {
@@ -61,37 +81,33 @@ export const FreeLLMIntegration: IIntegration = {
 
     const start = performance.now();
     try {
-      const controller = new AbortController();
-      const timeoutHandle = setTimeout(() => controller.abort(), config.timeout);
-
-      const response = await fetch(`${config.baseUrl}/chat/completions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${config.apiKey || "none"}`,
-        },
-        body: JSON.stringify({
-          model: "default",
-          messages: [{ role: "user", content: "OK" }],
-          max_tokens: 5,
-        }),
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutHandle);
-
+      const result = await checkFreeLLMHealth(config.baseUrl, config.apiKey, config.timeout);
       const latencyMs = Math.round(performance.now() - start);
 
+      if (!result.ok) {
+        const classified = result.status > 0
+          ? classifyHttpError(result.status, result.statusText, typeof result.body === "string" ? result.body : undefined, ID)
+          : classifyNetworkError(new Error(result.statusText), ID);
+
+        return {
+          status: "error",
+          latencyMs,
+          error: classified.message,
+          lastChecked: new Date().toISOString(),
+        };
+      }
+
       return {
-        status: response.ok ? "connected" : "error",
+        status: "connected",
         latencyMs,
-        error: response.ok ? undefined : `HTTP ${response.status}`,
         lastChecked: new Date().toISOString(),
-        lastSuccessAt: response.ok ? new Date().toISOString() : undefined,
+        lastSuccessAt: new Date().toISOString(),
       };
     } catch (err) {
+      const classified = classifyNetworkError(err, ID);
       return {
         status: "error",
-        error: err instanceof Error ? err.message : String(err),
+        error: classified.message,
         lastChecked: new Date().toISOString(),
       };
     }
@@ -100,52 +116,83 @@ export const FreeLLMIntegration: IIntegration = {
   async test(_overrides?: Partial<IntegrationConfig>): Promise<IntegrationTestResult> {
     const config = await this.loadConfiguration();
     if (!config?.baseUrl) {
-      return { success: false, error: "FreeLLM URL not configured" };
+      return { success: false, error: "FreeLLM URL not configured — enter a Base URL in the Configure dialog" };
     }
 
     const start = performance.now();
     try {
-      const controller = new AbortController();
-      const timeoutHandle = setTimeout(() => controller.abort(), Math.min(config.timeout, 15000));
-
-      const response = await fetch(`${config.baseUrl}/chat/completions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${config.apiKey || "none"}`,
-        },
-        body: JSON.stringify({
-          model: "default",
-          messages: [{ role: "user", content: "Say OK" }],
-          max_tokens: 5,
-        }),
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutHandle);
-
+      const result = await testFreeLLMConnection(config.baseUrl, config.apiKey, config.timeout);
       const latencyMs = Math.round(performance.now() - start);
 
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => "Unknown error");
+      if (!result.ok) {
+        const classified = result.status > 0
+          ? classifyHttpError(result.status, result.statusText, typeof result.body === "string" ? result.body : undefined, ID)
+          : classifyNetworkError(new Error(result.statusText), ID);
+
         return {
           success: false,
           latencyMs,
-          error: `HTTP ${response.status}: ${errorText.slice(0, 200)}`,
+          error: classified.message,
+          httpStatus: result.status || 0,
+          statusText: result.statusText,
         };
       }
-
-      const data = await response.json() as { model?: string; choices?: Array<{ message?: { content?: string } }> };
 
       return {
         success: true,
         latencyMs,
-        version: data.model,
+        version: result.version,
       };
     } catch (err) {
+      const classified = classifyNetworkError(err, ID);
       return {
         success: false,
-        error: err instanceof Error ? err.message : String(err),
+        latencyMs: Math.round(performance.now() - start),
+        error: classified.message,
       };
+    }
+  },
+
+  async discoverModels(_overrides?: Partial<IntegrationConfig>): Promise<DiscoveredModel[]> {
+    const config = await this.loadConfiguration();
+    if (!config?.baseUrl) return [];
+
+    try {
+      const baseUrl = config.baseUrl.replace(/\/+$/, "");
+      const result = await fetchWithRetry(`${baseUrl}/v1/models`, {
+        method: "GET",
+        timeoutMs: Math.min(config.timeout, 10000),
+        maxRetries: 1,
+        headers: {
+          Accept: "application/json",
+          ...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {}),
+        },
+        responseType: "json",
+        allowStatuses: [200, 401, 403],
+      });
+
+      if (!result.ok) {
+        logger.warn("integrations.freellm.discoverModels.failed", {
+          status: result.status,
+          statusText: result.statusText,
+        });
+        return [];
+      }
+
+      const body = result.body as { data?: Array<{ id?: string }> };
+      const models = (body.data ?? [])
+        .map((m) => m.id)
+        .filter((id): id is string => !!id);
+
+      return [
+        { id: "auto", label: "Auto (server default)", isDefault: true },
+        ...models.map((id) => ({ id, label: id })),
+      ];
+    } catch (err) {
+      logger.warn("integrations.freellm.discoverModels.error", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return [{ id: "auto", label: "Auto (server default)", isDefault: true }];
     }
   },
 
@@ -163,12 +210,16 @@ export const FreeLLMIntegration: IIntegration = {
           errors.push("Base URL must use http or https");
         }
       } catch {
-        errors.push("Base URL must be a valid URL");
+        errors.push("Base URL must be a valid URL (e.g. http://68.233.114.213:3002/v1)");
       }
     }
 
     if (config.timeout && (config.timeout < 1000 || config.timeout > 600000)) {
       errors.push("Timeout must be between 1000ms and 600000ms");
+    }
+
+    if (config.maxRetries && (config.maxRetries < 0 || config.maxRetries > 10)) {
+      errors.push("Max retries must be between 0 and 10");
     }
 
     return { valid: errors.length === 0, errors };
@@ -207,3 +258,84 @@ export const FreeLLMIntegration: IIntegration = {
     }
   },
 };
+
+interface FreeLLMHealthResult {
+  ok: boolean;
+  status: number;
+  statusText: string;
+  body: unknown;
+  version?: string;
+}
+
+async function checkFreeLLMHealth(
+  baseUrl: string,
+  apiKey: string | undefined,
+  timeout: number
+): Promise<FreeLLMHealthResult> {
+  const result = await fetchWithRetry(`${baseUrl}/chat/completions`, {
+    method: "POST",
+    timeoutMs: Math.min(timeout, 15000),
+    maxRetries: 1,
+    headers: {
+      "Content-Type": "application/json",
+      ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+    },
+    body: {
+      model: "auto",
+      messages: [{ role: "user", content: "OK" }],
+      max_tokens: 1,
+    },
+    responseType: "json",
+    allowStatuses: [200, 401, 403, 404, 422],
+  });
+
+  return {
+    ok: result.ok,
+    status: result.status,
+    statusText: result.statusText,
+    body: result.body,
+    version: extractModelFromResponse(result.body),
+  };
+}
+
+async function testFreeLLMConnection(
+  baseUrl: string,
+  apiKey: string | undefined,
+  timeout: number
+): Promise<FreeLLMHealthResult> {
+  const result = await fetchWithRetry(`${baseUrl}/chat/completions`, {
+    method: "POST",
+    timeoutMs: Math.min(timeout, 15000),
+    maxRetries: 1,
+    headers: {
+      "Content-Type": "application/json",
+      ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+    },
+    body: {
+      model: "auto",
+      messages: [{ role: "user", content: "Say OK" }],
+      max_tokens: 5,
+    },
+    responseType: "json",
+    allowStatuses: [200, 401, 403, 404, 422],
+  });
+
+  return {
+    ok: result.ok,
+    status: result.status,
+    statusText: result.statusText,
+    body: result.body,
+    version: extractModelFromResponse(result.body),
+  };
+}
+
+function extractModelFromResponse(body: unknown): string | undefined {
+  if (!body || typeof body !== "object") return undefined;
+  const obj = body as Record<string, unknown>;
+  if (typeof obj.model === "string") return obj.model;
+  if (obj.data && typeof obj.data === "object") {
+    const data = obj.data as Record<string, unknown>;
+    if (typeof data.model === "string") return data.model;
+  }
+  return undefined;
+}

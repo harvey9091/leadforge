@@ -26,7 +26,7 @@ export async function GET() {
         return apiSuccess({
           configured: !!(config.baseUrl && config.apiKey),
           baseUrl: config.baseUrl,
-          model: config.baseUrl ? "default" : "default",
+          model: "auto",
           temperature: 0.3,
           maxTokens: 4000,
           timeout: config.timeout,
@@ -43,7 +43,7 @@ export async function GET() {
     return apiSuccess({
       configured: !!(cfg.baseUrl && cfg.apiKey),
       baseUrl: cfg.baseUrl,
-      model: cfg.model,
+      model: cfg.model === "default" ? "auto" : cfg.model,
       temperature: cfg.temperature,
       maxTokens: cfg.maxTokens,
       timeout: cfg.timeout,
@@ -63,7 +63,7 @@ export async function POST(req: Request) {
 
     const baseUrl = (body.baseUrl ?? "").trim();
     const apiKey = (body.apiKey ?? "").trim();
-    const model = (body.model ?? "default").trim() || "default";
+    const model = (body.model ?? "auto").trim() || "auto";
     const temperature = clamp(parseFloat(body.temperature ?? "0.3"), 0, 2, 0.3);
     const maxTokens = clampInt(parseInt(body.maxTokens ?? "4000", 10), 1, 1_000_000, 4000);
     const timeout = clampInt(parseInt(body.timeout ?? "60000", 10), 1000, 600_000, 60000);
@@ -106,7 +106,7 @@ export async function POST(req: Request) {
       await saveFreeLLMConfig({
         baseUrl,
         apiKey: apiKey || (existing ? decryptApiKey(existing.apiKeyEnc) : ""),
-        model,
+        model: model === "default" ? "auto" : model,
         temperature,
         maxTokens,
         timeout,

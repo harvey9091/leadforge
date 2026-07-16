@@ -77,7 +77,7 @@ async function loadFromIntegrationManager(): Promise<{
     return {
       baseUrl: config.baseUrl,
       apiKey: config.apiKey,
-      model: "default",
+      model: "auto",
       temperature: 0.3,
       maxTokens: 4000,
       timeout: config.timeout,
@@ -178,7 +178,7 @@ export async function saveFreeLLMConfig(data: {
       id: "singleton",
       baseUrl: data.baseUrl.trim(),
       apiKeyEnc: encryptedKey,
-      model: data.model.trim() || "default",
+      model: data.model.trim() || "auto",
       temperature: data.temperature,
       maxTokens: data.maxTokens,
       timeout: data.timeout,
@@ -187,7 +187,7 @@ export async function saveFreeLLMConfig(data: {
     update: {
       baseUrl: data.baseUrl.trim(),
       apiKeyEnc: encryptedKey,
-      model: data.model.trim() || "default",
+      model: data.model.trim() || "auto",
       temperature: data.temperature,
       maxTokens: data.maxTokens,
       timeout: data.timeout,

@@ -76,6 +76,11 @@ interface TestResult {
   version?: string;
   error?: string;
   models?: string[];
+  httpStatus?: number;
+  statusText?: string;
+  probePath?: string;
+  documentationUrl?: string;
+  authRequired?: boolean;
 }
 
 export function IntegrationsSection() {
@@ -158,7 +163,7 @@ export function IntegrationsSection() {
         const result = await apiClient.post<TestResult>(`/settings/freellm/test`, {
           baseUrl,
           apiKey,
-          model: "default",
+          model: "auto",
         });
         setTestResult(result);
         if (result.success) {
@@ -192,11 +197,15 @@ export function IntegrationsSection() {
       toast({ title: "Enter a Base URL first", variant: "destructive" });
       return;
     }
+    if (modalIntegrationId !== "freellm") {
+      toast({ title: "Model discovery is only available for FreeLLM", variant: "destructive" });
+      return;
+    }
     setDiscoveringModels(true);
     setModels([]);
     try {
       const result = await apiClient.post<{ success: boolean; models: string[]; error?: string }>(
-        "/settings/freellm/models",
+        `/integrations/${modalIntegrationId}/models`,
         { baseUrl, apiKey }
       );
       if (result.success && result.models.length > 0) {
@@ -222,7 +231,7 @@ export function IntegrationsSection() {
         await apiClient.post("/settings/freellm", {
           baseUrl,
           apiKey,
-          model: "default",
+          model: "auto",
           temperature: 0.3,
           maxTokens: 4000,
           timeout,
@@ -341,7 +350,7 @@ export function IntegrationsSection() {
                 ) : (
                   <XCircle className="w-3.5 h-3.5 text-destructive shrink-0 mt-0.5" />
                 )}
-                <div>
+                <div className="flex-1">
                   <span className={cn("font-medium", testResult.success ? "text-success" : "text-destructive")}>
                     {testResult.success ? "Connected" : "Connection failed"}
                   </span>
@@ -351,8 +360,41 @@ export function IntegrationsSection() {
                       {testResult.version && <span className="ml-1">· Model: {testResult.version}</span>}
                     </span>
                   )}
-                  {testResult.error && (
-                    <p className="text-destructive mt-0.5 text-[11.5px]">{testResult.error}</p>
+                  {!testResult.success && (
+                    <div className="mt-1.5 space-y-1">
+                      {testResult.httpStatus && testResult.httpStatus > 0 && (
+                        <div className="flex items-center gap-2 text-[11px]">
+                          <span className={cn(
+                            "px-1.5 py-0.5 rounded text-[10px] font-mono font-bold",
+                            testResult.httpStatus === 401 && "bg-destructive/20 text-destructive",
+                            testResult.httpStatus === 403 && "bg-destructive/20 text-destructive",
+                            testResult.httpStatus === 404 && "bg-orange-500/20 text-orange-400",
+                            testResult.httpStatus >= 500 && "bg-orange-500/20 text-orange-400",
+                          )}>
+                            HTTP {testResult.httpStatus}
+                          </span>
+                          <span className="text-muted-foreground">{testResult.statusText}</span>
+                        </div>
+                      )}
+                      {testResult.probePath && (
+                        <div className="text-[11px] text-muted-foreground">
+                          Path: <code className="bg-muted/50 px-1 rounded">{testResult.probePath}</code>
+                        </div>
+                      )}
+                      {testResult.authRequired && (
+                        <div className="text-[11px] text-orange-400">
+                          Authentication required — check that the API key is correct.
+                        </div>
+                      )}
+                      {testResult.error && (
+                        <p className="text-destructive mt-0.5 text-[11px] font-mono break-all">{testResult.error}</p>
+                      )}
+                      {!testResult.httpStatus && !testResult.authRequired && (
+                        <p className="text-muted-foreground text-[11px]">
+                          Suggestion: Check Base URL, firewall rules, and that Server 2 (68.233.114.213) is reachable on the specified port.
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
@@ -456,18 +498,56 @@ export function IntegrationsSection() {
                 ) : (
                   <XCircle className="w-3.5 h-3.5 text-destructive shrink-0 mt-0.5" />
                 )}
-                <div>
+                <div className="flex-1">
                   <span className={cn("font-medium", testResult.success ? "text-success" : "text-destructive")}>
                     {testResult.success ? "Connected" : "Connection failed"}
                   </span>
                   {testResult.success && testResult.latencyMs != null && (
                     <span className="text-muted-foreground ml-1">· Latency: {testResult.latencyMs}ms</span>
                   )}
+                  {!testResult.success && (
+                    <div className="mt-1.5 space-y-1">
+                      {testResult.httpStatus && testResult.httpStatus > 0 && (
+                        <div className="flex items-center gap-2 text-[11px]">
+                          <span className={cn(
+                            "px-1.5 py-0.5 rounded text-[10px] font-mono font-bold",
+                            testResult.httpStatus === 401 && "bg-destructive/20 text-destructive",
+                            testResult.httpStatus === 403 && "bg-destructive/20 text-destructive",
+                            testResult.httpStatus === 404 && "bg-orange-500/20 text-orange-400",
+                            testResult.httpStatus >= 500 && "bg-orange-500/20 text-orange-400",
+                          )}>
+                            HTTP {testResult.httpStatus}
+                          </span>
+                          <span className="text-muted-foreground">{testResult.statusText}</span>
+                        </div>
+                      )}
+                      {testResult.probePath && (
+                        <div className="text-[11px] text-muted-foreground">
+                          Probed: <code className="bg-muted/50 px-1 rounded">{testResult.probePath}</code>
+                        </div>
+                      )}
+                      {testResult.documentationUrl && (
+                        <div className="text-[11px] text-muted-foreground">
+                          Docs: <code className="bg-muted/50 px-1 rounded">{testResult.documentationUrl}</code>
+                        </div>
+                      )}
+                      {testResult.authRequired && (
+                        <div className="text-[11px] text-orange-400">
+                          Authentication required — API key may be needed.
+                        </div>
+                      )}
+                      {testResult.error && (
+                        <p className="text-destructive mt-0.5 text-[11px] font-mono break-all">{testResult.error}</p>
+                      )}
+                      {!testResult.httpStatus && !testResult.authRequired && (
+                        <p className="text-muted-foreground text-[11px]">
+                          Suggestion: Check Base URL, firewall rules, and that Server 2 (68.233.114.213) is reachable on the specified port.
+                        </p>
+                      )}
+                    </div>
+                  )}
                   {testResult.version && (
                     <span className="text-muted-foreground ml-1">· Version: {testResult.version}</span>
-                  )}
-                  {testResult.error && (
-                    <p className="text-destructive mt-0.5 text-[11.5px]">{testResult.error}</p>
                   )}
                 </div>
               </div>

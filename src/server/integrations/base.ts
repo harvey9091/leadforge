@@ -40,14 +40,27 @@ export interface IntegrationTestResult {
   version?: string;
   error?: string;
   details?: Record<string, unknown>;
+  httpStatus?: number;
+  statusText?: string;
+  probePath?: string;
+  documentationUrl?: string;
+  authRequired?: boolean;
 }
 
 export interface IntegrationCapabilities {
-  healthCheck: boolean;
-  testConnection: boolean;
-  modelsList?: boolean;
-  versionEndpoint?: string;
-  metrics?: string[];
+  readonly healthCheck: boolean;
+  readonly testConnection: boolean;
+  readonly modelsList?: boolean;
+  readonly versionEndpoint?: string;
+  readonly metrics?: readonly string[];
+  readonly requiresAuth?: boolean;
+  readonly discoverModelsPath?: string;
+}
+
+export interface DiscoveredModel {
+  id: string;
+  label: string;
+  isDefault?: boolean;
 }
 
 export interface IIntegration {
@@ -64,4 +77,5 @@ export interface IIntegration {
   saveConfiguration(config: IntegrationConfig): Promise<void>;
   loadConfiguration(): Promise<IntegrationConfig | null>;
   getDefaultConfig(): IntegrationConfig;
+  discoverModels?(config?: Partial<IntegrationConfig>): Promise<DiscoveredModel[]>;
 }

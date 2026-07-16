@@ -35,7 +35,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
 const INTEGRATIONS: Array<{ id: string; name: string; description: string; icon: React.ComponentType<{ className?: string }>; defaultPort?: string; healthEndpoint: string }> = [
-  { id: "firecrawl", name: "Firecrawl", description: "Web scraping for company enrichment.", icon: Globe, defaultPort: "3003", healthEndpoint: "/v1/health" },
+  { id: "firecrawl", name: "Firecrawl", description: "Web scraping for company enrichment.", icon: Globe, defaultPort: "3003", healthEndpoint: "/, /openapi.json, /docs, /health, /version" },
   { id: "freellm", name: "FreeLLM", description: "LLM gateway for AI qualification.", icon: Sparkles, defaultPort: "3002", healthEndpoint: "/chat/completions" },
   { id: "redis", name: "Redis", description: "Cache and rate limiting store.", icon: Database, healthEndpoint: "" },
   { id: "rabbitmq", name: "RabbitMQ", description: "Job queue for background workers.", icon: Boxes, healthEndpoint: "" },

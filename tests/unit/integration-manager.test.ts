@@ -151,4 +151,42 @@ describe("IntegrationManager", () => {
   it("throws for unknown integration on save", async () => {
     await expect(manager.saveConfiguration("unknown", {} as IntegrationConfig)).rejects.toThrow();
   });
+
+  it("discovers models for integrations that support it", async () => {
+    const integration = createMockIntegration({
+      discoverModels: vi.fn().mockResolvedValue([
+        { id: "gpt-4", label: "GPT-4", isDefault: false },
+        { id: "auto", label: "Auto (server default)", isDefault: true },
+      ]),
+    });
+    manager.register(integration);
+
+    const models = await manager.discoverModels("test-service");
+    expect(models).toHaveLength(2);
+    expect(models[0].id).toBe("gpt-4");
+    expect(models[1].id).toBe("auto");
+  });
+
+  it("returns empty array for integrations without discoverModels", async () => {
+    const integration = createMockIntegration();
+    manager.register(integration);
+
+    const models = await manager.discoverModels("test-service");
+    expect(models).toEqual([]);
+  });
+
+  it("returns empty array for unknown integration on discoverModels", async () => {
+    const models = await manager.discoverModels("unknown");
+    expect(models).toEqual([]);
+  });
+
+  it("returns empty array when discoverModels throws", async () => {
+    const integration = createMockIntegration({
+      discoverModels: vi.fn().mockRejectedValue(new Error("Model discovery failed")),
+    });
+    manager.register(integration);
+
+    const models = await manager.discoverModels("test-service");
+    expect(models).toEqual([]);
+  });
 });

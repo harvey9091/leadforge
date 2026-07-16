@@ -60,7 +60,7 @@ export function FreeLLMSection() {
 
   const [baseUrl, setBaseUrl] = React.useState("");
   const [apiKey, setApiKey] = React.useState("");
-  const [model, setModel] = React.useState("default");
+  const [model, setModel] = React.useState("auto");
   const [temperature, setTemperature] = React.useState(0.3);
   const [maxTokens, setMaxTokens] = React.useState(4000);
   const [timeoutMs, setTimeoutMs] = React.useState(60000);
@@ -127,7 +127,7 @@ export function FreeLLMSection() {
     setTesting(true);
     setTestResult(null);
     try {
-    const testModel = model === "auto" ? "default" : model;
+    const testModel = model === "auto" ? "auto" : model;
     const result = await apiClient.post<FreeLLMStatus>("/settings/freellm/test", {
       baseUrl,
       apiKey,
@@ -153,12 +153,12 @@ export function FreeLLMSection() {
       await apiClient.post("/settings/freellm", {
         baseUrl,
         apiKey,
-      model: model === "auto" ? "default" : model,
-      temperature,
-      maxTokens,
-      timeout: timeoutMs,
-      streaming,
-      });
+        model: model === "default" ? "auto" : model,
+        temperature,
+        maxTokens,
+        timeout: timeoutMs,
+        streaming,
+        });
       await loadConfig();
       setTestResult(null);
       toast({ title: "FreeLLM configuration saved" });
@@ -231,7 +231,7 @@ export function FreeLLMSection() {
           </div>
         </SettingsRow>
 
-        <SettingsRow label="Model" description="The model to use. Use 'Auto' for the server default.">
+        <SettingsRow label="Model" description="The model to use. 'Auto' selects the server default.">
           <div className="w-72 space-y-2">
             <Select value={model} onValueChange={setModel}>
               <SelectTrigger className="h-8 text-[13px]">
@@ -239,8 +239,7 @@ export function FreeLLMSection() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="auto">Auto (server default)</SelectItem>
-                <SelectItem value="default">default</SelectItem>
-                {models.map((m) => (
+                {models.filter(m => m !== "auto").map((m) => (
                   <SelectItem key={m} value={m}>{m}</SelectItem>
                 ))}
               </SelectContent>
@@ -248,7 +247,7 @@ export function FreeLLMSection() {
             <div className="flex items-center gap-2">
               <Input
                 value={model === "auto" ? "" : model}
-                onChange={(e) => setModel(e.target.value || "default")}
+                onChange={(e) => setModel(e.target.value || "auto")}
                 placeholder="Or type a model name"
                 className="h-7 text-[12px]"
                 disabled={model === "auto"}
